@@ -52,6 +52,12 @@ export function setClock(fn: () => number): void {
   clock = fn
 }
 
+/**
+ * Sentinel seen row marking that first-load seeding ran. It has no ':' so it never matches a
+ * composite `${habitId}:${eventKey}` celebration key or deleteHabit's `${id}:` prefix pruning.
+ */
+export const SEEDED_KEY = '__seeded__'
+
 /** Composite keys already celebrated; loaded from the DB in load(). */
 let seen = new Set<string>()
 let nativeHooked = false
@@ -125,17 +131,16 @@ export const useApp = create<AppStore>()((set, get) => {
       ])
       seen = seenKeys
       const now = clock()
-      if (seen.size === 0) {
-        // First launch or empty history: don't replay celebrations for days before today.
+      if (!seen.has(SEEDED_KEY)) {
+        // Once per install: don't replay celebrations for days before today.
         const today = dayKey(now)
         const old = habits
           .flatMap((h) => evaluate(h, sessions, now).events)
           .filter((e) => e.day < today)
           .map(celebrationKey)
-        if (old.length) {
-          await repo.markSeen(old)
-          old.forEach((k) => seen.add(k))
-        }
+        const keys = [...old, SEEDED_KEY]
+        await repo.markSeen(keys)
+        keys.forEach((k) => seen.add(k))
       }
       set({ habits, sessions, settings, ...derive(habits, sessions, now) })
       hookNative()

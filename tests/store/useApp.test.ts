@@ -14,7 +14,7 @@ import { dayKey, nextDay } from '@/domain/days'
 import { STALE_MS } from '@/domain/evaluate'
 import type { Habit, Session } from '@/domain/types'
 import type { NotifSpec } from '@/notify/plan'
-import { setClock, useApp } from '@/store/useApp'
+import { SEEDED_KEY, setClock, useApp } from '@/store/useApp'
 
 // Mid-winter base: fixtures never cross a DST change.
 const BASE = new Date(2026, 0, 5)
@@ -68,6 +68,26 @@ describe('useApp', () => {
     now = at(2)
     await S().load()
     expect(S().queue.map((c) => c.key)).toEqual([`a:DAY_COMPLETE:${k(1)}`])
+  })
+
+  it('seeds once per install via a sentinel: undismissed day-1 events are still queued on day 2', async () => {
+    await repo.putHabit(habit('a'))
+    await repo.putSession(sess('a', 0, 60))
+    await S().load() // day 1: nothing before today, but the sentinel is written
+    expect(await repo.seenKeys()).toEqual(new Set([SEEDED_KEY]))
+    expect(S().queue.map((c) => c.key)).toEqual([`a:DAY_COMPLETE:${k(0)}`])
+
+    now = at(1)
+    await S().load()
+    expect(S().queue.map((c) => c.key)).toEqual([`a:DAY_COMPLETE:${k(0)}`])
+    expect(S().queue.some((c) => c.key === SEEDED_KEY)).toBe(false)
+  })
+
+  it('deleteHabit keeps the seeding sentinel', async () => {
+    await repo.putHabit(habit('a'))
+    await S().load()
+    await S().deleteHabit('a')
+    expect((await repo.seenKeys()).has(SEEDED_KEY)).toBe(true)
   })
 
   it('start then stop updates sessions, running, and reschedules', async () => {

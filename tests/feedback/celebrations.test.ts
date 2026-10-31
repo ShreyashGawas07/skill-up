@@ -23,6 +23,10 @@ describe('toCelebrations', () => {
     expect(toCelebrations([ev('DAY_COMPLETE')], new Set(['DAY_COMPLETE:2026-10-31']))).toHaveLength(1)
   })
 
+  it('ignores the __seeded__ sentinel in the seen set', () => {
+    expect(toCelebrations([ev('DAY_COMPLETE')], new Set(['__seeded__']))).toHaveLength(1)
+  })
+
   it('orders by kind priority', () => {
     const events = [
       ev('ETERNAL'), ev('HABIT_FORMED'), ev('RANK_UP', undefined, 2), ev('STREAK_MILESTONE', undefined, 7),

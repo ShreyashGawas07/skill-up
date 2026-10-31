@@ -11,7 +11,7 @@ import { useReduce } from '@/ui/art/useReduce'
 import { iconGlyph } from '@/ui/icons'
 import { fmtClock, fmtHM, fmtInt } from './parts/format'
 import { Glyph } from './parts/Glyphs'
-import { useCardMoments } from './parts/useCardMoments'
+import { todayOvertime, useCardMoments } from './parts/useCardMoments'
 
 interface Props {
   habit: Habit
@@ -30,7 +30,7 @@ const LONG_PRESS_MS = 550
 export function HabitCard({ habit, state, running, now, reducedMotion, onStart, onStop, onOpen, onEdit }: Props) {
   const reduce = useReduce(reducedMotion)
   const live = running?.habitId === habit.id
-  const { todayMinutes: today, commitment: c, overtimeMinutes } = state
+  const { todayMinutes: today, commitment: c } = state
   const color = habit.color
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -53,17 +53,18 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
 
   const totalH = Math.floor(state.totalMinutes / 60)
   const target = habit.targetHours
-  const nextTier = Math.min(state.rank + 1, MAX_TIER)
+  // The marker shows the next tier to earn; a cracked (lowered) rank doesn't move it back.
+  const nextTier = Math.min(state.earnedTier + 1, MAX_TIER)
   const nextAt = tierThresholdHours(nextTier, target) / target
 
   return (
     <motion.div
       ref={cardRef}
-      layout
+      layout={!reduce}
       className="relative rounded-[28px] p-[2px]"
       style={{ background: `linear-gradient(140deg, ${color}, ${color}22 45%, ${color}10 60%, ${color}aa)` }}
       initial={reduce ? { opacity: 0 } : { opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
     >
       <div
         className="relative overflow-hidden rounded-[26px] bg-[#12121b] p-4"
@@ -96,7 +97,7 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
             >
               <Ring
                 progress={c > 0 ? today / c : 0}
-                overtime={c > 0 ? overtimeMinutes / c : 0}
+                overtime={c > 0 ? todayOvertime(state) / c : 0}
                 color={color}
                 size={164}
                 reducedMotion={reducedMotion}
@@ -206,11 +207,11 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
             <motion.div
               className="h-full rounded-full"
               style={{ background: `linear-gradient(90deg, ${color}, #ffffff)`, minWidth: 6 }}
-              initial={{ width: 0 }}
+              initial={reduce ? false : { width: 0 }}
               animate={{ width: `${Math.min(100, (totalH / target) * 100)}%` }}
             />
-            {state.rank < MAX_TIER && (
-              <div className="absolute top-0 h-full w-[2px] bg-white/70" style={{ left: `${Math.min(99.5, nextAt * 100)}%` }} aria-hidden />
+            {state.earnedTier < MAX_TIER && (
+              <div data-testid="next-tier" className="absolute top-0 h-full w-[2px] bg-white/70" style={{ left: `${Math.min(99.5, nextAt * 100)}%` }} aria-hidden />
             )}
           </div>
           <div className="mt-1 text-right text-xs tabular-nums text-white/60">

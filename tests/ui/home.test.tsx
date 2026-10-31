@@ -214,3 +214,42 @@ describe('Home filters', () => {
     expect(screen.queryByRole('button', { name: 'Start Chess' })).toBeNull()
   })
 })
+
+describe('HabitCard overtime and next tier', () => {
+  it('overdrive arc uses only today\'s overtime, not lifetime overtime', async () => {
+    await repo.putHabit(habit('a'))
+    await act(() => S().load())
+    act(() => useApp.setState({ states: { a: state('a', { overtimeMinutes: 300, todayMinutes: 0 }) } }))
+    const { container } = render(<Home onNavigate={nav} />)
+    expect(container.querySelector('[data-testid="overdrive"]')).toBeNull()
+    act(() => useApp.setState({ states: { a: state('a', { overtimeMinutes: 300, todayMinutes: 60 }) } }))
+    expect(container.querySelector('[data-testid="overdrive"]')).toBeNull()
+    act(() => useApp.setState({ states: { a: state('a', { overtimeMinutes: 330, todayMinutes: 90 }) } }))
+    expect(container.querySelector('[data-testid="overdrive"]')).not.toBeNull()
+  })
+
+  it('"+15m" spark follows today\'s overtime while running', async () => {
+    await repo.putHabit(habit('a'))
+    await act(() => S().load())
+    act(() =>
+      useApp.setState({
+        running: { id: 'r', habitId: 'a', start: now },
+        states: { a: state('a', { overtimeMinutes: 100, todayMinutes: 50 }) },
+      }),
+    )
+    render(<Home onNavigate={nav} />)
+    expect(screen.queryByText('✦ +15m')).toBeNull()
+    // Lifetime overtime unchanged, today crosses commitment + 15m: spark.
+    act(() => useApp.setState({ states: { a: state('a', { overtimeMinutes: 100, todayMinutes: 75 }) } }))
+    expect(screen.getByText('✦ +15m')).toBeInTheDocument()
+  })
+
+  it('next-tier marker follows earnedTier + 1, not rank + 1', async () => {
+    await repo.putHabit(habit('a', { targetHours: 1000 }))
+    await act(() => S().load())
+    // Rank dropped to 2 after misses, but tier 5 (Expert) was earned: next marker is tier 6 at 20%.
+    act(() => useApp.setState({ states: { a: state('a', { rank: 2, earnedTier: 5, lostTiers: 3 }) } }))
+    render(<Home onNavigate={nav} />)
+    expect(screen.getByTestId('next-tier')).toHaveStyle({ left: '20%' })
+  })
+})

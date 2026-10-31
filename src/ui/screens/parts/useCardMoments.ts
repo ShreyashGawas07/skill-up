@@ -13,6 +13,11 @@ interface Args {
   cardRef: RefObject<HTMLElement>
 }
 
+/** Today's overtime in minutes (time past today's commitment); 0 on a rest day (commitment 0). */
+export function todayOvertime(state: Pick<HabitState, 'todayMinutes' | 'commitment'>): number {
+  return state.commitment > 0 ? Math.max(0, state.todayMinutes - state.commitment) : 0
+}
+
 /** Auto-clears a counter-triggered pop after `ms`. */
 function useFlash(ms: number): [number, () => void] {
   const [n, setN] = useState(0)
@@ -28,10 +33,10 @@ function useFlash(ms: number): [number, () => void] {
  * Live card moments:
  * - commitment crossed during a tick (prev < c ≤ now): confetti in the habit colour, haptic.success
  *   and a "+1 🔥" pop, once per habit per day;
- * - overtime: a "+15m" sparkle for every extra 15 minutes while this habit runs.
+ * - overtime: a "+15m" sparkle for every extra 15 minutes past today's commitment while this habit runs.
  */
 export function useCardMoments({ habitId, state, live, color, reduce, cardRef }: Args) {
-  const { todayMinutes: today, commitment: c, overtimeMinutes, today: day } = state
+  const { todayMinutes: today, commitment: c, today: day } = state
   const [pop, firePop] = useFlash(1800)
   const [spark, fireSpark] = useFlash(1500)
 
@@ -60,7 +65,7 @@ export function useCardMoments({ habitId, state, live, color, reduce, cardRef }:
     firePop()
   }, [today, c, day, habitId])
 
-  const bucket = Math.floor(overtimeMinutes / 15)
+  const bucket = Math.floor(todayOvertime(state) / 15)
   const prevBucket = useRef(bucket)
   useEffect(() => {
     if (live && bucket > prevBucket.current && bucket > 0) {

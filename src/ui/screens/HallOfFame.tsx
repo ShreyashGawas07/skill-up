@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { format, parse } from 'date-fns'
 import type { Habit, HabitState } from '@/domain/types'
 import { useApp } from '@/store/useApp'
 import { Emblem } from '@/ui/art/Emblem'
 import { iconGlyph } from '@/ui/icons'
 import type { Navigate } from '@/ui/route'
-import { ConfirmSheet } from './parts/ConfirmSheet'
+import { DeleteSheets } from './parts/DeleteSheets'
 import { fmtInt, motionPref } from './parts/format'
 import { Glyph } from './parts/Glyphs'
 import { ScreenHeader } from './parts/ScreenHeader'
@@ -49,24 +49,11 @@ function Trophy({ habit, st, onOpen, onDelete, rm }: { habit: Habit; st: HabitSt
 export function HallOfFame({ onNavigate }: { onNavigate: Navigate }) {
   const habits = useApp((s) => s.habits)
   const states = useApp((s) => s.states)
-  const deleteHabit = useApp((s) => s.deleteHabit)
   const rm = motionPref(useApp((s) => s.settings.reduceMotion))
   const eternal = habits.filter((h) => states[h.id]?.eternal)
 
-  // Two-step delete: 1 = first confirm, 2 = "can't be undone".
-  const [del, setDel] = useState<{ habit: Habit; step: 1 | 2 } | null>(null)
-  const [busy, setBusy] = useState(false)
-  const cancel = useCallback(() => setDel(null), [])
-
-  const finalDelete = async (h: Habit) => {
-    setBusy(true)
-    try {
-      await deleteHabit(h.id)
-    } finally {
-      setBusy(false)
-      setDel(null)
-    }
-  }
+  const [del, setDel] = useState<Habit>()
+  const cancel = useCallback(() => setDel(undefined), [])
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-10 pt-4">
@@ -92,7 +79,7 @@ export function HallOfFame({ onNavigate }: { onNavigate: Navigate }) {
                 st={states[h.id]}
                 rm={rm}
                 onOpen={() => onNavigate(`detail:${h.id}`)}
-                onDelete={() => setDel({ habit: h, step: 1 })}
+                onDelete={() => setDel(h)}
               />
             ))}
           </ul>
@@ -102,37 +89,7 @@ export function HallOfFame({ onNavigate }: { onNavigate: Navigate }) {
         </div>
       )}
 
-      <AnimatePresence>
-        {del?.step === 1 && (
-          <ConfirmSheet
-            key="d1"
-            title={`Delete ${del.habit.name}?`}
-            art={<Emblem tier={10} size={72} animate={false} />}
-            confirmLabel="Delete"
-            danger
-            onConfirm={() => setDel({ habit: del.habit, step: 2 })}
-            onCancel={cancel}
-            reducedMotion={rm}
-          >
-            This trophy and its history leave the Hall.
-          </ConfirmSheet>
-        )}
-        {del?.step === 2 && (
-          <ConfirmSheet
-            key="d2"
-            title="Are you sure?"
-            art={<Emblem tier={10} size={72} cracked animate={false} />}
-            confirmLabel="Delete forever"
-            danger
-            busy={busy}
-            onConfirm={() => void finalDelete(del.habit)}
-            onCancel={cancel}
-            reducedMotion={rm}
-          >
-            Deleting {del.habit.name} can't be undone.
-          </ConfirmSheet>
-        )}
-      </AnimatePresence>
+      <DeleteSheets habit={del} tier={10} twoStep onCancel={cancel} onDeleted={cancel} reducedMotion={rm} />
     </div>
   )
 }

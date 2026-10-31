@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useState } from 'react'
 import { App } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { notificationPermission } from '@/notify/scheduler'
 
-export type Permission = 'granted' | 'denied' | 'prompt'
+/** 'unsupported' = not running natively (web preview): no local notifications at all. */
+export type Permission = 'granted' | 'denied' | 'prompt' | 'unsupported'
 
-/** Current notification permission; re-checked on mount and whenever the app resumes. */
+/** Current notification permission; on native, re-checked on mount and whenever the app resumes. */
 export function usePermission(): [Permission | undefined, () => Promise<void>] {
-  const [perm, setPerm] = useState<Permission>()
+  const native = Capacitor.isNativePlatform()
+  const [perm, setPerm] = useState<Permission | undefined>(native ? undefined : 'unsupported')
   const check = useCallback(async () => {
+    if (!native) return
     try {
       setPerm(await notificationPermission())
     } catch {
       setPerm(undefined)
     }
-  }, [])
+  }, [native])
 
   useEffect(() => {
+    if (!native) return
     let alive = true
     let remove: (() => void) | undefined
     void check()
@@ -29,13 +34,13 @@ export function usePermission(): [Permission | undefined, () => Promise<void>] {
         })
         .catch(() => {})
     } catch {
-      // App plugin unavailable (web); mount-time check is enough.
+      // App plugin unavailable; the mount-time check is enough.
     }
     return () => {
       alive = false
       remove?.()
     }
-  }, [check])
+  }, [check, native])
 
   return [perm, check]
 }

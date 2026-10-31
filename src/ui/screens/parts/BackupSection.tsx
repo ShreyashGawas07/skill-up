@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { exportBackup, importBackup, parseBackup } from '@/data/backup'
 import type { Backup } from '@/data/backup'
-import { useApp } from '@/store/useApp'
+import { currentTime, useApp } from '@/store/useApp'
 import { ConfirmSheet } from './ConfirmSheet'
 import { Glyph } from './Glyphs'
 import { backupFileName, saveBackupFile } from './backupFile'
@@ -10,11 +10,12 @@ import { backupFileName, saveBackupFile } from './backupFile'
 const tile =
   'flex min-h-[96px] flex-1 flex-col items-center justify-center gap-2 rounded-3xl bg-white/[0.05] font-semibold active:scale-95 disabled:opacity-50'
 
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
 /** Export (share / download) and import (pick, validate, preview, confirm) of the full backup. */
 export function BackupSection({ reducedMotion }: { reducedMotion?: boolean }) {
-  const now = useApp((s) => s.now)
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -28,10 +29,10 @@ export function BackupSection({ reducedMotion }: { reducedMotion?: boolean }) {
     setDone(undefined)
     try {
       const b = await exportBackup()
-      await saveBackupFile(backupFileName(now), JSON.stringify(b, null, 2))
+      await saveBackupFile(backupFileName(currentTime()), JSON.stringify(b, null, 2))
       setDone('Backup saved')
     } catch (e) {
-      setError(`Export failed: ${(e as Error)?.message ?? String(e)}`)
+      setError(`Export failed: ${errMsg(e)}`)
     } finally {
       setBusy(false)
     }
@@ -42,7 +43,14 @@ export function BackupSection({ reducedMotion }: { reducedMotion?: boolean }) {
     if (!file) return
     setError(undefined)
     setDone(undefined)
-    const r = parseBackup(await file.text())
+    let text: string
+    try {
+      text = await file.text()
+    } catch (e) {
+      setError(`Could not read file: ${errMsg(e)}`)
+      return
+    }
+    const r = parseBackup(text)
     if (r.ok) setPending(r.backup)
     else setError(r.error)
   }
@@ -50,11 +58,19 @@ export function BackupSection({ reducedMotion }: { reducedMotion?: boolean }) {
   const onImport = async (b: Backup) => {
     setBusy(true)
     try {
-      await importBackup(b)
-      await useApp.getState().load()
-      setDone('Backup restored')
-    } catch (e) {
-      setError(`Import failed: ${(e as Error)?.message ?? String(e)}`)
+      try {
+        await importBackup(b)
+      } catch (e) {
+        setError(`Import failed: ${errMsg(e)}`)
+        return
+      }
+      try {
+        await useApp.getState().load()
+        setDone('Backup restored')
+      } catch {
+        // The data is already replaced on disk; only the in-memory reload failed.
+        setError('Restored — reopen the app')
+      }
     } finally {
       setBusy(false)
       setPending(undefined)

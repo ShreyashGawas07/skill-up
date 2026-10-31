@@ -39,6 +39,7 @@ import { dayKey } from '@/domain/days'
 import type { Habit, HabitState, Session } from '@/domain/types'
 import { setClock, useApp } from '@/store/useApp'
 import { HabitDetail } from '@/ui/screens/HabitDetail'
+import { ConfirmSheet } from '@/ui/screens/parts/ConfirmSheet'
 import { HallOfFame } from '@/ui/screens/HallOfFame'
 import { Settings } from '@/ui/screens/Settings'
 import { Home } from '@/ui/screens/Home'
@@ -63,8 +64,30 @@ const state = (habitId: string, over: Partial<HabitState> = {}): HabitState => (
 })
 
 const nav = vi.fn()
+/** Store actions some tests swap for failing fakes; restored before each test. */
+const REAL = { deleteHabit: S().deleteHabit, load: S().load }
+const URL_REAL = { create: URL.createObjectURL, revoke: URL.revokeObjectURL }
+
+/** Renders and lets mount-time async work (permission check) settle inside act. */
+async function mount(ui: React.ReactElement) {
+  await act(async () => {
+    render(ui)
+  })
+}
+
+/** Confirms step 1 of a two-step delete and waits for its sheet's exit animation to finish. */
+async function firstConfirm() {
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
+  await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1))
+}
+
+afterEach(() => {
+  URL.createObjectURL = URL_REAL.create
+  URL.revokeObjectURL = URL_REAL.revoke
+})
 
 beforeEach(async () => {
+  useApp.setState(REAL)
   await Promise.all(db.tables.map((t) => t.clear()))
   now = at(40)
   setClock(() => now)
@@ -159,6 +182,33 @@ describe('HabitDetail', () => {
     expect(await repo.listHabits()).toHaveLength(0)
     expect(await repo.listSessions()).toHaveLength(0)
   })
+
+  it('an eternal habit needs two confirmations to delete from detail', async () => {
+    await seedHabit(habit('a'), { eternal: true, rank: 10, earnedTier: 10 })
+    render(<HabitDetail habitId="a" onNavigate={nav} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete habit' }))
+    await firstConfirm()
+    expect(await repo.listHabits()).toHaveLength(1)
+    const second = await screen.findByRole('dialog', { name: 'Are you sure?' })
+    await act(async () => {
+      fireEvent.click(within(second).getByRole('button', { name: 'Delete forever' }))
+    })
+    await waitFor(() => expect(nav).toHaveBeenCalledWith('home'))
+    expect(await repo.listHabits()).toHaveLength(0)
+  })
+
+  it('a failed delete shows an alert and keeps the sheet open', async () => {
+    await seedHabit(habit('a'), {})
+    act(() => useApp.setState({ deleteHabit: vi.fn(async () => Promise.reject(new Error('disk full'))) }))
+    render(<HabitDetail habitId="a" onNavigate={nav} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete habit' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    })
+    const sheet = screen.getByRole('dialog')
+    expect(within(sheet).getByRole('alert')).toHaveTextContent('disk full')
+    expect(nav).not.toHaveBeenCalled()
+  })
 })
 
 describe('HallOfFame', () => {
@@ -204,7 +254,7 @@ describe('HallOfFame', () => {
     await seedHall()
     render(<HallOfFame onNavigate={nav} />)
     fireEvent.click(screen.getByRole('button', { name: 'Delete Guitar' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    await firstConfirm()
     expect(await repo.listHabits()).toHaveLength(3)
     const second = screen.getByRole('dialog')
     expect(second).toHaveTextContent(/can't be undone/i)
@@ -212,6 +262,19 @@ describe('HallOfFame', () => {
       fireEvent.click(within(second).getByRole('button', { name: 'Delete forever' }))
     })
     await waitFor(async () => expect((await repo.listHabits()).map((h) => h.id).sort()).toEqual(['b', 'c']))
+  })
+
+  it('a failed trophy delete shows an alert in the sheet', async () => {
+    await seedHall()
+    act(() => useApp.setState({ deleteHabit: vi.fn(async () => Promise.reject(new Error('locked db'))) }))
+    render(<HallOfFame onNavigate={nav} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Guitar' }))
+    await firstConfirm()
+    const second = await screen.findByRole('dialog', { name: 'Are you sure?' })
+    await act(async () => {
+      fireEvent.click(within(second).getByRole('button', { name: 'Delete forever' }))
+    })
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('locked db')
   })
 
   it('tapping a trophy opens its detail', async () => {
@@ -226,7 +289,7 @@ describe('Settings', () => {
   const onBack = vi.fn()
 
   it('has sound and reduce-motion controls but no theme switch', async () => {
-    render(<Settings onBack={onBack} />)
+    await mount(<Settings onBack={onBack} />)
     expect(screen.queryByText(/theme/i)).toBeNull()
     const sound = screen.getByRole('switch', { name: 'Sound' })
     expect(sound).toHaveAttribute('aria-checked', 'false')
@@ -242,9 +305,19 @@ describe('Settings', () => {
     expect(S().settings.theme).toBe('system')
   })
 
-  it('notifications: Enable requests permission when not yet asked', async () => {
+  it('notifications on web: "Available in the app", no permission check or hint', async () => {
+    sched.notificationPermission.mockResolvedValue('denied')
+    await mount(<Settings onBack={onBack} />)
+    expect(screen.getByText('Available in the app')).toBeInTheDocument()
+    expect(screen.queryByText(/Open settings/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enable' })).toBeNull()
+    expect(sched.notificationPermission).not.toHaveBeenCalled()
+  })
+
+  it('notifications: Enable requests permission when not yet asked (native)', async () => {
+    platform.native = true
     sched.notificationPermission.mockResolvedValue('prompt')
-    render(<Settings onBack={onBack} />)
+    await mount(<Settings onBack={onBack} />)
     const btn = await screen.findByRole('button', { name: 'Enable' })
     sched.notificationPermission.mockResolvedValue('granted')
     await act(async () => {
@@ -254,9 +327,10 @@ describe('Settings', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Enable' })).toBeNull())
   })
 
-  it('notifications: denied shows the open-settings hint', async () => {
+  it('notifications: denied shows the open-settings hint (native)', async () => {
+    platform.native = true
     sched.notificationPermission.mockResolvedValue('denied')
-    render(<Settings onBack={onBack} />)
+    await mount(<Settings onBack={onBack} />)
     expect(await screen.findByText(/Open settings/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Enable' })).toBeNull()
   })
@@ -273,12 +347,13 @@ describe('Settings', () => {
       downloaded = this.download
     })
     await repo.putHabit(habit('a'))
-    render(<Settings onBack={onBack} />)
+    await mount(<Settings onBack={onBack} />)
+    now = at(41) // the clock moves on after the screen opened; the name uses click time
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Export backup' }))
     })
     await waitFor(() => expect(click).toHaveBeenCalled())
-    expect(downloaded).toBe('skillup-backup-2026-02-14.json')
+    expect(downloaded).toBe('skillup-backup-2026-02-15.json')
     const json = JSON.parse(await created[0].text())
     expect(json.app).toBe('skillup')
     expect(json.habits).toHaveLength(1)
@@ -288,7 +363,7 @@ describe('Settings', () => {
 
   it('export on native writes to the cache dir and shares the file', async () => {
     platform.native = true
-    render(<Settings onBack={onBack} />)
+    await mount(<Settings onBack={onBack} />)
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Export backup' }))
     })
@@ -310,11 +385,38 @@ describe('Settings', () => {
   }
 
   it('import of an invalid file shows its error and does not import', async () => {
-    render(<Settings onBack={onBack} />)
+    await mount(<Settings onBack={onBack} />)
     await pick('{not json')
     expect(await screen.findByRole('alert')).toHaveTextContent('File is not valid JSON')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(importBackup).not.toHaveBeenCalled()
+  })
+
+  it('a file that cannot be read shows an alert', async () => {
+    await mount(<Settings onBack={onBack} />)
+    const f = new File(['{}'], 'b.json', { type: 'application/json' })
+    f.text = () => Promise.reject(new Error('permission revoked'))
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Backup file'), { target: { files: [f] } })
+    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('permission revoked')
+    expect(importBackup).not.toHaveBeenCalled()
+  })
+
+  it('if import succeeds but reload fails, says to reopen the app', async () => {
+    const backup = {
+      app: 'skillup', version: 1, exportedAt: now, habits: [habit('x')], sessions: [], seen: [],
+      settings: { theme: 'system', sound: false, reduceMotion: 'system' },
+    }
+    await mount(<Settings onBack={onBack} />)
+    await pick(JSON.stringify(backup))
+    act(() => useApp.setState({ load: vi.fn(async () => Promise.reject(new Error('boom'))) }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Replace' }))
+    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Restored — reopen the app')
+    expect(screen.queryByText(/Import failed/)).toBeNull()
+    expect(await repo.listHabits()).toHaveLength(1)
   })
 
   it('import of a valid file previews counts and imports on confirm', async () => {
@@ -326,7 +428,7 @@ describe('Settings', () => {
       app: 'skillup', version: 1, exportedAt: now, habits, sessions, seen: [],
       settings: { theme: 'system', sound: true, reduceMotion: 'off' },
     }
-    render(<Settings onBack={onBack} />)
+    await mount(<Settings onBack={onBack} />)
     await pick(JSON.stringify(backup))
     const sheet = await screen.findByRole('dialog')
     expect(sheet).toHaveTextContent('2 habits, 143 sessions will replace current data')
@@ -340,23 +442,48 @@ describe('Settings', () => {
     expect(S().settings.sound).toBe(true)
   })
 
-  it('back button returns', () => {
-    render(<Settings onBack={onBack} />)
+  it('back button returns', async () => {
+    await mount(<Settings onBack={onBack} />)
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(onBack).toHaveBeenCalled()
   })
 })
 
 describe('PermissionBanner on Home', () => {
-  it('shows when notification permission is denied', async () => {
+  it('shows (persistently, no dismiss) when permission is denied on native', async () => {
+    platform.native = true
     sched.notificationPermission.mockResolvedValue('denied')
-    render(<Home onNavigate={nav} />)
-    expect(await screen.findByRole('region', { name: 'Notifications off' })).toBeInTheDocument()
+    await mount(<Home onNavigate={nav} />)
+    const banner = await screen.findByRole('region', { name: 'Notifications off' })
+    expect(within(banner).queryByRole('button', { name: /dismiss/i })).toBeNull()
   })
 
-  it('is hidden when permission is granted', async () => {
-    render(<Home onNavigate={nav} />)
+  it('never shows on web, even if permission reads denied', async () => {
+    sched.notificationPermission.mockResolvedValue('denied')
+    await mount(<Home onNavigate={nav} />)
+    expect(screen.queryByRole('region', { name: 'Notifications off' })).toBeNull()
+    expect(sched.notificationPermission).not.toHaveBeenCalled()
+  })
+
+  it('is hidden when permission is granted on native', async () => {
+    platform.native = true
+    await mount(<Home onNavigate={nav} />)
     await waitFor(() => expect(sched.notificationPermission).toHaveBeenCalled())
     expect(screen.queryByRole('region', { name: 'Notifications off' })).toBeNull()
+  })
+})
+
+describe('ConfirmSheet', () => {
+  it('ignores Escape and backdrop while busy', () => {
+    const onCancel = vi.fn()
+    const { container, rerender } = render(
+      <ConfirmSheet title="T" confirmLabel="Go" busy onConfirm={() => {}} onCancel={onCancel} />,
+    )
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.click(container.firstChild as Element)
+    expect(onCancel).not.toHaveBeenCalled()
+    rerender(<ConfirmSheet title="T" confirmLabel="Go" onConfirm={() => {}} onCancel={onCancel} />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalledTimes(1)
   })
 })

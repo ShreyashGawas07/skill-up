@@ -86,13 +86,14 @@ export function Settings({ onBack }: { onBack(): void }) {
         </div>
       </div>
 
-      <Row icon={<Glyph name={perm === 'granted' ? 'bell' : 'bellOff'} />} label="Notifications">
+      <Row icon={<Glyph name={perm === 'granted' || perm === 'unsupported' ? 'bell' : 'bellOff'} />} label="Notifications">
         {perm === 'granted' && (
           <span className="flex items-center gap-1 rounded-full bg-[#69db7c]/15 px-3 py-1 text-sm font-semibold text-[#69db7c]">
             <Glyph name="check" size={14} />
             On
           </span>
         )}
+        {perm === 'unsupported' && <span className="text-sm text-white/40">Available in the app</span>}
         {perm === 'prompt' && (
           <button
             type="button"

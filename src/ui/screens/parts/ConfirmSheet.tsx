@@ -9,23 +9,34 @@ interface Props {
   art?: ReactNode
   confirmLabel: string
   danger?: boolean
+  /** While true, both buttons are disabled and Escape/backdrop do nothing. */
   busy?: boolean
+  /** Failure message shown inside the sheet (role=alert); the sheet stays open. */
+  error?: string
   onConfirm(): void
   onCancel(): void
   reducedMotion?: boolean
 }
 
-/** Bottom-sheet confirmation. Tapping the backdrop or pressing Escape cancels. */
-export function ConfirmSheet({ title, children, art, confirmLabel, danger, busy, onConfirm, onCancel, reducedMotion }: Props) {
+/** Bottom-sheet confirmation. Tapping the backdrop or pressing Escape cancels (unless busy). */
+export function ConfirmSheet({ title, children, art, confirmLabel, danger, busy, error, onConfirm, onCancel, reducedMotion }: Props) {
   const cancelRef = useRef<HTMLButtonElement>(null)
+  const busyRef = useRef(busy)
+  busyRef.current = busy
+  const cancel = () => {
+    if (!busyRef.current) onCancel()
+  }
+  const cancelLatest = useRef(cancel)
+  cancelLatest.current = cancel
+
   useEffect(() => {
     cancelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') cancelLatest.current()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
+  }, [])
 
   return (
     <motion.div
@@ -33,7 +44,7 @@ export function ConfirmSheet({ title, children, art, confirmLabel, danger, busy,
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onCancel}
+      onClick={cancel}
     >
       <motion.div
         role="dialog"
@@ -49,12 +60,18 @@ export function ConfirmSheet({ title, children, art, confirmLabel, danger, busy,
         {art && <div className="mb-3 flex justify-center">{art}</div>}
         <p className="font-display text-lg font-semibold">{title}</p>
         {children && <div className="mt-1 text-sm text-white/60">{children}</div>}
+        {error && (
+          <p role="alert" className="mt-3 rounded-2xl bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {error}
+          </p>
+        )}
         <div className="mt-5 flex gap-3">
           <button
             ref={cancelRef}
             type="button"
-            onClick={onCancel}
-            className="min-h-[48px] flex-1 rounded-2xl bg-white/10 font-semibold active:scale-95"
+            disabled={busy}
+            onClick={cancel}
+            className="min-h-[48px] flex-1 rounded-2xl bg-white/10 font-semibold active:scale-95 disabled:opacity-50"
           >
             Cancel
           </button>

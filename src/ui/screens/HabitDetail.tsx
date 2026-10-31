@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AnimatePresence } from 'framer-motion'
 import { addMonths, format, parse, startOfMonth } from 'date-fns'
 import { useApp } from '@/store/useApp'
 import { Emblem } from '@/ui/art/Emblem'
@@ -10,7 +9,7 @@ import { Ladder } from '@/ui/art/Ladder'
 import { iconGlyph } from '@/ui/icons'
 import type { Navigate } from '@/ui/route'
 import { BadgeCabinet } from './parts/BadgeCabinet'
-import { ConfirmSheet } from './parts/ConfirmSheet'
+import { DeleteSheets } from './parts/DeleteSheets'
 import { fmtHM, fmtInt, motionPref } from './parts/format'
 import { Glyph } from './parts/Glyphs'
 import { ScreenHeader, iconBtn } from './parts/ScreenHeader'
@@ -42,13 +41,11 @@ export function HabitDetail({ habitId, onNavigate }: { habitId: string; onNaviga
   const st = useApp((s) => s.states[habitId])
   const allSessions = useApp((s) => s.sessions)
   const now = useApp((s) => s.now)
-  const deleteHabit = useApp((s) => s.deleteHabit)
   const rm = motionPref(useApp((s) => s.settings.reduceMotion))
   const sessions = useMemo(() => allSessions.filter((s) => s.habitId === habitId), [allSessions, habitId])
 
   const [month, setMonth] = useState<string | null>(null)
   const [confirm, setConfirm] = useState(false)
-  const [busy, setBusy] = useState(false)
   const cancel = useCallback(() => setConfirm(false), [])
 
   const back = () => onNavigate(st?.eternal ? 'hall' : 'home')
@@ -66,16 +63,6 @@ export function HabitDetail({ habitId, onNavigate }: { habitId: string; onNaviga
   const shown = month ?? maxMonth
   const step = (n: number) => setMonth(monthKey(addMonths(parse(shown, FMT, new Date()), n)))
   const editable = habit.archivedAt === undefined && !st.eternal
-
-  const onDelete = async () => {
-    setBusy(true)
-    try {
-      await deleteHabit(habit.id)
-      onNavigate('home')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-6 px-4 pb-10 pt-4">
@@ -149,22 +136,14 @@ export function HabitDetail({ habitId, onNavigate }: { habitId: string; onNaviga
         Delete habit
       </button>
 
-      <AnimatePresence>
-        {confirm && (
-          <ConfirmSheet
-            title={`Delete ${habit.name}?`}
-            art={<Emblem tier={st.rank} size={72} cracked animate={false} />}
-            confirmLabel="Delete"
-            danger
-            busy={busy}
-            onConfirm={() => void onDelete()}
-            onCancel={cancel}
-            reducedMotion={rm}
-          >
-            All hours, sessions and badges are erased.
-          </ConfirmSheet>
-        )}
-      </AnimatePresence>
+      <DeleteSheets
+        habit={confirm ? habit : undefined}
+        tier={st.rank}
+        twoStep={st.eternal}
+        onCancel={cancel}
+        onDeleted={() => onNavigate('home')}
+        reducedMotion={rm}
+      />
     </div>
   )
 }

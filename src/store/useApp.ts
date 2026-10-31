@@ -51,6 +51,8 @@ let clock: () => number = () => Date.now()
 export function setClock(fn: () => number): void {
   clock = fn
 }
+/** The store's current time (honours setClock), for one-off reads such as file names. */
+export const currentTime = (): number => clock()
 
 /**
  * Sentinel seen row marking that first-load seeding ran. It has no ':' so it never matches a

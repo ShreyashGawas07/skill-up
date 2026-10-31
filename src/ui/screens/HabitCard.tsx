@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Habit, HabitState, Session } from '@/domain/types'
 import { tierThresholdHours, MAX_TIER } from '@/domain/tiers'
@@ -48,6 +48,8 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
     }, LONG_PRESS_MS)
   }
   const endPress = () => clearTimeout(press.current)
+  useEffect(() => () => clearTimeout(press.current), [])
+  const clockId = useId()
 
   const totalH = Math.floor(state.totalMinutes / 60)
   const target = habit.targetHours
@@ -75,13 +77,13 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
       >
         <button
           type="button"
-          aria-label="Edit"
+          aria-label={`Edit ${habit.name}`}
           onClick={(e) => {
             e.stopPropagation()
             onEdit()
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-white/5 text-white/60 active:scale-90"
+          className="absolute right-2 top-2 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/5 text-white/60 active:scale-90"
         >
           <Glyph name="pencil" size={18} />
         </button>
@@ -101,7 +103,8 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
               >
                 <button
                   type="button"
-                  aria-label={live ? 'Stop' : 'Start'}
+                  aria-label={`${live ? 'Stop' : 'Start'} ${habit.name}`}
+                  aria-describedby={live ? clockId : undefined}
                   onClick={(e) => {
                     e.stopPropagation()
                     haptic.tick()
@@ -117,7 +120,7 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
                 >
                   {live ? (
                     <>
-                      <span className="font-display text-lg font-bold tabular-nums">{fmtClock(now - running!.start)}</span>
+                      <span id={clockId} className="font-display text-lg font-bold tabular-nums">{fmtClock(now - running!.start)}</span>
                       <span className="mt-1 h-4 w-4 rounded-[4px] bg-white" aria-hidden />
                     </>
                   ) : (
@@ -136,8 +139,8 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
                 <motion.div
                   key={`pop${pop}`}
                   className="pointer-events-none absolute inset-x-0 top-6 text-center font-display text-3xl font-bold drop-shadow-[0_0_12px_rgba(255,170,60,.9)]"
-                  initial={{ opacity: 0, y: 10, scale: 0.6 }}
-                  animate={{ opacity: 1, y: reduce ? 0 : -36, scale: 1.15 }}
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.6 }}
+                  animate={reduce ? { opacity: 1 } : { opacity: 1, y: -36, scale: 1.15 }}
                   exit={{ opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 14 }}
                 >
@@ -148,8 +151,8 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
                 <motion.div
                   key={`spark${spark}`}
                   className="pointer-events-none absolute right-0 top-2 font-display text-lg font-bold text-[#ffcf3f] drop-shadow-[0_0_8px_#ff9f1c]"
-                  initial={{ opacity: 0, scale: 0.5 }}
-                  animate={{ opacity: 1, scale: 1, y: reduce ? 0 : -18 }}
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+                  animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, y: -18 }}
                   exit={{ opacity: 0 }}
                 >
                   ✦ +15m
@@ -158,7 +161,18 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
             </AnimatePresence>
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-2 pr-6">
+          {/* Keyboard/AT entry to detail; pointer taps anywhere on the card bubble to the same handler. */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`Open ${habit.name}`}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return
+              e.preventDefault()
+              onOpen()
+            }}
+            className="flex min-w-0 flex-1 flex-col items-start gap-2 rounded-2xl pr-8 outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          >
             <div className="flex items-center gap-2">
               <Emblem
                 tier={state.rank}

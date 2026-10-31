@@ -123,6 +123,35 @@ describe('Edit habit', () => {
   })
 })
 
+describe('Edit habit errors', () => {
+  it('an unknown habitId does not fall back to add: it closes', async () => {
+    const { container } = render(<AddHabit habitId="nope" onDone={done} />)
+    await waitFor(() => expect(done).toHaveBeenCalled())
+    expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull()
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('shows an updateHabit rejection to the user', async () => {
+    await repo.putHabit(habit('a'))
+    await act(() => S().load())
+    const original = S().updateHabit
+    useApp.setState({ updateHabit: vi.fn(async () => { throw new Error('Disk full') }) })
+    try {
+      render(<AddHabit habitId="a" onDone={done} />)
+      next()
+      next()
+      next()
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      })
+      expect(await screen.findByRole('alert')).toHaveTextContent('Disk full')
+      expect(done).not.toHaveBeenCalled()
+    } finally {
+      act(() => useApp.setState({ updateHabit: original }))
+    }
+  })
+})
+
 describe('validateHabitInput', () => {
   const ok = { name: 'Run', icon: 'run', color: '#fff', dailyMinutes: 60, targetHours: 100, reminderTime: '07:30' }
   const ctx = { formed: false, totalHours: 0 }

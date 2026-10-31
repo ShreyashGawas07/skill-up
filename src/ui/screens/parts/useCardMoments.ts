@@ -48,17 +48,13 @@ export function useCardMoments({ habitId, state, live, color, reduce, cardRef }:
       box && box.width && window.innerWidth
         ? { x: (box.left + box.width * 0.3) / window.innerWidth, y: (box.top + box.height / 2) / window.innerHeight }
         : { x: 0.5, y: 0.4 }
-    try {
-      void confetti({
-        particleCount: reduce ? 40 : 150,
-        spread: 85,
-        startVelocity: 42,
-        origin,
-        colors: [color, '#ffffff', '#ffd43b'],
-        disableForReducedMotion: reduce,
-      })
-    } catch {
-      // no canvas available
+    // Confetti is motion: skip it entirely under reduce-motion (in-app setting or OS); keep haptic + fading pop.
+    if (!reduce) {
+      try {
+        void confetti({ particleCount: 150, spread: 85, startVelocity: 42, origin, colors: [color, '#ffffff', '#ffd43b'] })
+      } catch {
+        // no canvas available
+      }
     }
     haptic.success()
     firePop()

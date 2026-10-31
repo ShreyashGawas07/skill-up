@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useApp, type HabitInput } from '@/store/useApp'
 import { haptic } from '@/feedback/haptics'
@@ -106,6 +106,13 @@ export function AddHabit({ habitId, onDone }: Props) {
       setSaving(false)
     }
   }
+
+  // Edit target gone (e.g. deleted elsewhere): close instead of silently becoming an Add form.
+  const missing = !!habitId && !editing
+  useEffect(() => {
+    if (missing) onDone()
+  }, [missing, onDone])
+  if (missing) return null
 
   const body = [
     <NameStep

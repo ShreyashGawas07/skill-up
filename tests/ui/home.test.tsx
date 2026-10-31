@@ -101,8 +101,9 @@ describe('HabitCard', () => {
     await act(() => S().load())
     act(() => useApp.setState({ states: { a: state('a', { formed: true, formingDone: 30 }) } }))
     render(<Home onNavigate={nav} />)
-    expect(screen.getAllByText('Formed').length).toBeGreaterThan(0)
+    expect(screen.getByText('Formed')).toBeInTheDocument()
     expect(screen.queryByText(/Day \d+\/30/)).toBeNull()
+    expect(screen.queryByRole('img', { name: /of 30 days/ })).toBeNull()
   })
 
   it('Start calls start(id), becomes Stop with a running clock after tick', async () => {
@@ -110,11 +111,12 @@ describe('HabitCard', () => {
     await act(() => S().load())
     render(<Home onNavigate={nav} />)
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Start a' }))
     })
     await waitFor(() => expect(S().running?.habitId).toBe('a'))
     act(() => S().tick(now + 5000))
-    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
+    const stopBtn = screen.getByRole('button', { name: 'Stop a' })
+    expect(stopBtn).toHaveAccessibleDescription('0:00:05')
     expect(screen.getByText('0:00:05')).toBeInTheDocument()
     expect(nav).not.toHaveBeenCalled()
   })
@@ -148,7 +150,64 @@ describe('HabitCard', () => {
     await repo.putHabit(habit('a'))
     await act(() => S().load())
     render(<Home onNavigate={nav} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit a' }))
     expect(nav).toHaveBeenCalledWith('edit:a')
+  })
+
+  it('respects the in-app reduce-motion setting: no confetti, still haptic and +1', async () => {
+    await repo.putHabit(habit('a'))
+    await act(() => S().load())
+    act(() => useApp.setState({ settings: { ...S().settings, reduceMotion: 'on' }, states: { a: state('a', { todayMinutes: 59 }) } }))
+    render(<Home onNavigate={nav} />)
+    act(() => useApp.setState({ states: { a: state('a', { todayMinutes: 60 }) } }))
+    expect(confetti).not.toHaveBeenCalled()
+    expect(haptic.success).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('+1 🔥')).toBeInTheDocument()
+  })
+
+  it('has a focusable "Open {name}" control that opens detail by click or keyboard', async () => {
+    await repo.putHabit(habit('a', { name: 'Guitar' }))
+    await act(() => S().load())
+    render(<Home onNavigate={nav} />)
+    const open = screen.getByRole('button', { name: 'Open Guitar' })
+    fireEvent.click(open)
+    expect(nav).toHaveBeenCalledTimes(1)
+    expect(nav).toHaveBeenCalledWith('detail:a')
+    expect(screen.getByRole('button', { name: 'Start Guitar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Guitar' })).toBeInTheDocument()
+  })
+
+  it('long-press opens edit, and a pending long-press is cleared on unmount', async () => {
+    await repo.putHabit(habit('a'))
+    await act(() => S().load())
+    vi.useFakeTimers()
+    try {
+      const { unmount } = render(<Home onNavigate={nav} />)
+      const open = screen.getByRole('button', { name: 'Open a' })
+      fireEvent.pointerDown(open)
+      act(() => vi.advanceTimersByTime(600))
+      expect(nav).toHaveBeenCalledWith('edit:a')
+      nav.mockClear()
+      fireEvent.pointerDown(open)
+      unmount()
+      vi.advanceTimersByTime(600)
+      expect(nav).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('Home filters', () => {
+  it('hides eternal habits', async () => {
+    await repo.putHabit(habit('a', { name: 'Guitar' }))
+    await repo.putHabit(habit('b', { name: 'Chess' }))
+    await act(() => S().load())
+    act(() => useApp.setState({ states: { a: state('a'), b: state('b', { eternal: true, rank: 10 }) } }))
+    render(<Home onNavigate={nav} />)
+    expect(screen.getByText('Guitar')).toBeInTheDocument()
+    expect(screen.queryByText('Chess')).toBeNull()
+    expect(screen.getAllByRole('img', { name: 'Add a habit' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Start Chess' })).toBeNull()
   })
 })

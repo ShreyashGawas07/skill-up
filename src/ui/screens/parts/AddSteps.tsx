@@ -48,7 +48,7 @@ export function NameStep(p: {
           </button>
         ))}
       </div>
-      <div role="radiogroup" aria-label="Colour" className="flex flex-wrap justify-center gap-2.5">
+      <div role="radiogroup" aria-label="Colour" className="grid grid-cols-4 gap-x-3">
         {HABIT_COLORS.map((c, i) => (
           <button
             key={c}
@@ -57,12 +57,16 @@ export function NameStep(p: {
             aria-checked={p.color === c}
             aria-label={`Colour ${i + 1}`}
             onClick={() => p.onColor(c)}
-            className="h-8 w-8 rounded-full transition active:scale-90"
-            style={{
-              background: c,
-              boxShadow: p.color === c ? `0 0 0 3px #0b0b12, 0 0 0 5px ${c}, 0 0 16px ${c}` : undefined,
-            }}
-          />
+            className="grid h-11 w-11 place-items-center rounded-full active:scale-90"
+          >
+            <span
+              className="h-8 w-8 rounded-full transition"
+              style={{
+                background: c,
+                boxShadow: p.color === c ? `0 0 0 3px #0b0b12, 0 0 0 5px ${c}, 0 0 16px ${c}` : undefined,
+              }}
+            />
+          </button>
         ))}
       </div>
     </div>
@@ -99,7 +103,7 @@ export function TargetStep(p: { value: number; min: number; color: string; onCha
             type="button"
             aria-label={`${h} hours`}
             onClick={() => set(h)}
-            className="rounded-full px-4 py-2 font-display font-semibold active:scale-90"
+            className="h-11 min-w-[56px] rounded-full px-4 font-display font-semibold active:scale-90"
             style={{ background: p.value === h ? p.color : 'rgba(255,255,255,.07)', color: p.value === h ? '#0b0b12' : undefined }}
           >
             {short(h)}

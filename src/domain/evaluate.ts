@@ -6,6 +6,11 @@ import type { AppEvent, DayKey, DayRecord, EventType, Habit, HabitState, Session
 /** A running session older than this is excluded until the user resolves it. */
 export const STALE_MS = 16 * 3600_000
 
+/** An open session (no end) that has run longer than STALE_MS — likely a forgotten timer. */
+export function isStale(s: Session, now: number): boolean {
+  return s.end === undefined && now - s.start > STALE_MS
+}
+
 export const FORMING_DAYS = 30
 export const RECOVERY_DAYS = 7
 export const MISS_PENALTY = 2
@@ -32,7 +37,7 @@ export function evaluate(habit: Habit, sessions: Session[], now: number): HabitS
   const counted: Session[] = []
   for (const s of sessions) {
     if (s.habitId !== habit.id) continue
-    if (s.end === undefined && now - s.start > STALE_MS) {
+    if (isStale(s, now)) {
       staleSession = s
       continue
     }

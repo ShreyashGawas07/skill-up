@@ -31,8 +31,8 @@ describe('backup', () => {
   it('export -> parse -> import round-trips', async () => {
     await repo.putHabit(habit('a'))
     await repo.putHabit(habit('b', { archivedAt: 9 }))
-    await repo.putSession(session('s1', 'a'))
-    await repo.putSession(session('s2', 'b', { end: undefined }))
+    await repo.putSession(session('s1', 'a', { end: undefined }))
+    await repo.putSession(session('s2', 'b'))
     await repo.markSeen(['k1', 'k2'])
     await repo.putSettings({ theme: 'dark', sound: true, reduceMotion: 'off' })
     const exported = await exportBackup()
@@ -81,6 +81,13 @@ describe('backup', () => {
     }
     expect(err(mk({ habits: [habit('a'), habit('a')] }))).toMatch(/duplicate/i)
     expect(err(mk({ sessions: [session('s1', 'zzz')] }))).toMatch(/habit/i)
+  })
+
+  it('rejects an open session (no end) on an archived habit; allows it on an active one', () => {
+    const open = session('s1', 'a', { end: undefined })
+    expect(err(mk({ habits: [habit('a', { archivedAt: 900 })], sessions: [open] }))).toMatch(/archived/)
+    expect(parse(mk({ habits: [habit('a')], sessions: [open] })).ok).toBe(true)
+    expect(parse(mk({ habits: [habit('a', { archivedAt: 900 })], sessions: [session('s1', 'a')] })).ok).toBe(true)
   })
 
   it('failed import rolls back and leaves db unchanged', async () => {

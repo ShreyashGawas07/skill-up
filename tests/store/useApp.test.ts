@@ -308,6 +308,54 @@ describe('useApp', () => {
     expect(S().states.a.staleSession).toEqual(open)
   })
 
+  it('a timer still running when its habit reaches Eternal is stopped on tick', async () => {
+    await repo.putHabit(habit('e', { targetHours: 2 }))
+    await repo.putSession(sess('e', 0, 60))
+    now = at(0, 9)
+    await S().load()
+    await S().start('e')
+    expect(S().running?.habitId).toBe('e')
+    expect(S().states.e.eternal).toBe(false)
+    sched.applySchedule.mockClear()
+    now += 61 * 60000
+    S().tick(now)
+    await vi.waitFor(() => expect(S().running).toBeUndefined())
+    expect(S().states.e.eternal).toBe(true)
+    expect(await repo.openSession()).toBeUndefined()
+    expect((await repo.listSessions('e')).find((x) => x.id !== 'e-0')?.end).toBe(now)
+    await vi.waitFor(() => expect(sched.applySchedule).toHaveBeenCalled())
+    const last = scheduled(sched.applySchedule.mock.calls.length - 1)
+    expect(last.some((x) => x.kind === 'running')).toBe(false)
+  })
+
+  it('load/refresh stop a timer whose habit is already Eternal', async () => {
+    await repo.putHabit(habit('e', { targetHours: 1 }))
+    const open: Session = { id: 'open', habitId: 'e', start: at(0, 9) }
+    await repo.putSession(open)
+    now = at(0, 11)
+    await S().load()
+    expect(S().running).toBeUndefined()
+    expect(S().states.e.eternal).toBe(true)
+    expect(await repo.openSession()).toBeUndefined()
+    expect(scheduled(sched.applySchedule.mock.calls.length - 1).some((x) => x.kind === 'running')).toBe(false)
+  })
+
+  it('a stale open session on an archived habit still surfaces (judged at the real now)', async () => {
+    await repo.putHabit(habit('a', { archivedAt: at(0, 3) }))
+    await repo.putHabit(habit('b'))
+    const open: Session = { id: 'open', habitId: 'a', start: at(0, 2) }
+    await repo.putSession(open)
+    now = at(0, 2) + STALE_MS + 60000
+    await S().load()
+    expect(S().running).toBeUndefined()
+    expect(S().states.a.staleSession).toEqual(open)
+    // The dialog can resolve it, which unblocks timers.
+    await S().resolveStale(at(0, 3))
+    expect(S().states.a.staleSession).toBeUndefined()
+    await S().start('b')
+    expect(S().running?.habitId).toBe('b')
+  })
+
   it('saveSettings persists', async () => {
     await S().load()
     await S().saveSettings({ theme: 'light', sound: true, reduceMotion: 'off' })

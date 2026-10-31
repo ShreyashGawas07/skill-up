@@ -21,9 +21,11 @@ export function StaleSessionDialog() {
   const habit = useApp((s) => s.habits.find((h) => h.id === stale?.habitId))
   const now = useApp((s) => s.now)
   const resolveStale = useApp((s) => s.resolveStale)
+  const refresh = useApp((s) => s.refresh)
   const reduce = useReduce(motionPref(useApp((s) => s.settings.reduceMotion)))
   const [mins, setMins] = useState<number>()
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(false)
   const keepRef = useRef<HTMLButtonElement>(null)
 
   // On open: focus "Keep 16h"; on close: hand focus back to whatever had it before.
@@ -47,6 +49,11 @@ export function StaleSessionDialog() {
     try {
       await resolveStale(endAt)
       setMins(undefined)
+      setError(false)
+    } catch {
+      // E.g. the session was already closed elsewhere: say so and reload the real state.
+      setError(true)
+      await refresh().catch(() => {})
     } finally {
       setBusy(false)
     }
@@ -121,6 +128,11 @@ export function StaleSessionDialog() {
             Stop at {stopLabel}
           </button>
         </div>
+        {error && (
+          <p role="alert" className="mt-3 text-center text-sm text-[#ff8787]">
+            Couldn't save the stop time. Please try again.
+          </p>
+        )}
       </motion.div>
     </motion.div>
   )

@@ -70,7 +70,7 @@ function habitError(h: unknown, i: number): string | null {
   return null
 }
 
-function sessionError(s: unknown, i: number, habitIds: Set<string>): string | null {
+function sessionError(s: unknown, i: number, habitIds: Set<string>, archived: Set<string>): string | null {
   const p = `sessions[${i}]`
   if (!isObj(s)) return `${p} is not an object`
   if (!isStr(s.id) || !isStr(s.habitId)) return `${p}.id and habitId must be strings`
@@ -80,6 +80,9 @@ function sessionError(s: unknown, i: number, habitIds: Set<string>): string | nu
     if (s.end < s.start) return `${p}.end must not be before start`
   }
   if (!habitIds.has(s.habitId)) return `${p} references unknown habit ${s.habitId}`
+  if (s.end === undefined && archived.has(s.habitId)) {
+    return `${p} is still running on archived habit ${s.habitId}`
+  }
   return null
 }
 
@@ -109,16 +112,18 @@ export function parseBackup(json: string): ParseResult {
   }
 
   const ids = new Set<string>()
+  const archived = new Set<string>()
   for (const [i, h] of raw.habits.entries()) {
     const e = habitError(h, i)
     if (e) return fail(e)
     const id = (h as Habit).id
     if (ids.has(id)) return fail(`duplicate habit id ${id}`)
     ids.add(id)
+    if ((h as Habit).archivedAt !== undefined) archived.add(id)
   }
   const sids = new Set<string>()
   for (const [i, s] of raw.sessions.entries()) {
-    const e = sessionError(s, i, ids)
+    const e = sessionError(s, i, ids, archived)
     if (e) return fail(e)
     const id = (s as Session).id
     if (sids.has(id)) return fail(`duplicate session id ${id}`)

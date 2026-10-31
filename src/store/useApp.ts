@@ -44,6 +44,10 @@ export interface AppStore {
   resolveStale(endAt: number): Promise<void>
   dismiss(key: string): Promise<void>
   saveSettings(s: Settings): Promise<void>
+  /** Re-plans notifications from the current state (e.g. after permission was granted). */
+  reschedule(): Promise<void>
+  /** Re-reads habits and sessions from the DB, recomputes, and reschedules. */
+  refresh(): Promise<void>
 }
 
 let clock: () => number = () => Date.now()
@@ -71,6 +75,12 @@ const stateOf = (h: Habit, sessions: Session[], now: number) =>
 function derive(habits: Habit[], sessions: Session[], now: number) {
   const states: Record<string, HabitState> = {}
   for (const h of habits) states[h.id] = stateOf(h, sessions, now)
+  // Archived habits are evaluated at archivedAt, so judge an open session's staleness at the real
+  // now: otherwise a forgotten timer on an archived habit never surfaces and blocks every timer.
+  for (const s of sessions) {
+    const st = states[s.habitId]
+    if (st && !st.staleSession && isStale(s, now)) states[s.habitId] = { ...st, staleSession: s }
+  }
   // A stale open session is surfaced via states[x].staleSession, not as running.
   const running = sessions.find((s) => s.end === undefined && !isStale(s, now))
   const events = habits.filter((h) => h.archivedAt === undefined).flatMap((h) => states[h.id].events)
@@ -96,10 +106,31 @@ export const useApp = create<AppStore>()((set, get) => {
     return scheduling
   }
 
+  /**
+   * Eternal habits leave Home and get no notifications, so a timer still running when its habit
+   * reaches Eternal would have no Stop anywhere: stop it at `now`. Returns true if it stopped one.
+   */
+  let retiring = false
+  async function stopEternalTimer(now: number): Promise<boolean> {
+    const { running, states } = get()
+    if (retiring || !running || !states[running.habitId]?.eternal) return false
+    retiring = true
+    try {
+      return (await stopTimer(now)) !== undefined
+    } catch (e) {
+      if (!(e instanceof StaleSessionError)) console.warn('Stopping the eternal habit timer failed', e)
+      return false
+    } finally {
+      retiring = false
+    }
+  }
+
   /** Re-reads habits and sessions, recomputes everything, and reschedules notifications. */
   async function refresh(): Promise<void> {
     const [habits, sessions] = await Promise.all([repo.listHabits(), repo.listSessions()])
-    set({ habits, sessions, ...derive(habits, sessions, clock()) })
+    const now = clock()
+    set({ habits, sessions, ...derive(habits, sessions, now) })
+    if (await stopEternalTimer(now)) return refresh()
     await reschedule()
   }
 
@@ -157,12 +188,14 @@ export const useApp = create<AppStore>()((set, get) => {
       }
       set({ habits, sessions, settings, ...derive(habits, sessions, now) })
       hookNative()
+      if (await stopEternalTimer(now)) return refresh()
       await reschedule()
     },
 
     tick(now) {
       const { habits, sessions } = get()
       set(derive(habits, sessions, now))
+      void stopEternalTimer(now).then((stopped) => (stopped ? refresh() : undefined)).catch(() => {})
     },
 
     async addHabit(input) {
@@ -248,5 +281,8 @@ export const useApp = create<AppStore>()((set, get) => {
       await repo.putSettings(s)
       set({ settings: { ...s } })
     },
+
+    reschedule,
+    refresh,
   }
 })

@@ -33,7 +33,7 @@ const at = (n: number, h = 12) => setHours(addDays(BASE, n), h).getTime()
 let now = at(0)
 const S = () => useApp.getState()
 /** Tests below swap store actions for spies; restore the real ones before each test. */
-const REAL = { dismiss: S().dismiss, resolveStale: S().resolveStale }
+const REAL = { dismiss: S().dismiss, resolveStale: S().resolveStale, refresh: S().refresh }
 
 const habit = (id: string, over: Partial<Habit> = {}): Habit => ({
   id, name: id, icon: 'book', color: '#4dabf7', targetHours: 10000, reminderTime: '19:00',
@@ -396,6 +396,28 @@ describe('StaleSessionDialog', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(outside).toHaveFocus()
     outside.remove()
+  })
+
+  it('a failed resolve shows an alert, re-enables the buttons and refreshes', async () => {
+    seedStale()
+    const resolveStale = vi.fn(async (_endAt: number): Promise<void> => {
+      throw new Error('Session s1 is not open')
+    })
+    const refresh = vi.fn(async () => {})
+    act(() => useApp.setState({ resolveStale, refresh }))
+    render(<StaleSessionDialog />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Keep 16h' }))
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn.t save/i)
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Keep 16h' })).toBeEnabled()
+    // A later success clears the message.
+    resolveStale.mockResolvedValueOnce(undefined)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Keep 16h' }))
+    })
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('offers no way to type hours or extend past 16h', () => {

@@ -84,6 +84,22 @@ describe('pickMessage', () => {
     }
   })
 
+  it('missed copy only claims a drop when rankLost is true', () => {
+    const claims = /dropped|tier back|climb back/
+    for (let i = 0; i < 200; i++) {
+      for (const ctx of [{ ...sparse, rankLost: false }, { ...full, rankLost: undefined }]) {
+        const m = pickMessage('missed', ctx, `s${i}`)
+        expect(m.title + m.body).not.toMatch(claims)
+      }
+    }
+    const lost = Array.from({ length: 100 }, (_, i) => pickMessage('missed', { ...full, rankLost: true }, `s${i}`))
+    expect(lost.some((m) => (m.title + m.body).includes('dropped to Expert'))).toBe(true)
+  })
+
+  it('lastChance copy does not repeat "save it"', () => {
+    for (const v of POOLS.lastChance) expect((v.title + ' ' + v.body).match(/\bsaves? it\b/gi)?.length ?? 0).toBeLessThanOrEqual(1)
+  })
+
   it('hashSeed is deterministic and unsigned', () => {
     expect(hashSeed('abc')).toBe(hashSeed('abc'))
     expect(hashSeed('abc')).not.toBe(hashSeed('abd'))

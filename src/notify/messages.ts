@@ -8,11 +8,15 @@ export interface MsgCtx {
   rankName: string
   dropToName: string
   startedAt?: string
+  /** True only when the miss being reported actually cost a tier. Drop-claiming copy needs it. */
+  rankLost?: boolean
 }
 
 interface Variant {
   title: string
   body: string
+  /** Claims a tier was lost: only eligible when ctx.rankLost is true. */
+  claimsDrop?: boolean
 }
 
 /**
@@ -20,7 +24,7 @@ interface Variant {
  * A variant is only eligible when the context it cites is meaningful:
  * {streak} needs streak > 0, {day} needs formingDay, {start} needs startedAt,
  * {drop} needs dropToName !== rankName, and so do "{rank} rank on the line" / "{rank} is slipping"
- * (a Novice can't drop). The first variant of each kind is the spec §4 copy.
+ * (a Novice can't drop). Variants flagged `claimsDrop` need ctx.rankLost === true. The first variant of each kind is the spec §4 copy.
  * Every kind keeps at least one variant with no optional placeholders so a pick always exists.
  */
 export const POOLS: Record<NotifKind, Variant[]> = {
@@ -34,7 +38,7 @@ export const POOLS: Record<NotifKind, Variant[]> = {
   ],
   lastChance: [
     { title: '⏳ Last call', body: '{left} left or {habit} drops to {drop}.' },
-    { title: '🕛 Your {streak}-day streak ends at midnight', body: '{left} of {habit} saves it. Save it?' },
+    { title: '🕛 Your {streak}-day streak ends at midnight', body: '{left} of {habit} keeps it alive. Save it?' },
     { title: '🚨 {rank} is slipping', body: 'Miss today and you fall to {drop}. {left} of {habit} stops it.' },
     { title: '⏳ Clock’s almost out', body: '{left} of {habit} before midnight. Go go go.' },
     { title: '🌙 One more push', body: '{habit} still needs {left}. Finish strong.' },
@@ -52,10 +56,10 @@ export const POOLS: Record<NotifKind, Variant[]> = {
     { title: '💪 {left} of {habit} — done', body: 'Day secured. Overtime counts toward your rank.' },
   ],
   missed: [
-    { title: '💔 You dropped to {rank}', body: '7 clean days wins a tier back.' },
+    { title: '💔 You dropped to {rank}', body: '7 clean days wins a tier back.', claimsDrop: true },
     { title: '💔 {habit} missed yesterday', body: 'Comeback arc starts today. {left} to get back on track.' },
-    { title: '🩹 Shake it off', body: 'You’re {rank} now. Stack 7 clean days of {habit} to climb back.' },
-    { title: '🔄 New day, new run', body: '{left} of {habit} today starts the climb back.' },
+    { title: '🩹 Shake it off', body: 'You’re {rank} now. Stack 7 clean days of {habit} to climb back.', claimsDrop: true },
+    { title: '🔄 New day, new run', body: '{left} of {habit} today starts a fresh streak.' },
   ],
 }
 
@@ -79,6 +83,7 @@ export function hashSeed(seed: string): number {
 
 function eligible(v: Variant, ctx: MsgCtx): boolean {
   const t = v.title + v.body
+  if (v.claimsDrop && ctx.rankLost !== true) return false
   if (t.includes('{streak}') && !(ctx.streak > 0)) return false
   if (t.includes('{day}') && ctx.formingDay === undefined) return false
   if (t.includes('{start}') && !ctx.startedAt) return false

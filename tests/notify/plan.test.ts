@@ -48,6 +48,9 @@ const one = (state: Partial<HabitState> = {}, now = NOW, running?: Session, habi
   buildSchedule({ habits: [habit], states: { a: makeState('a', now, state) }, running, now })
 
 const ofKind = (specs: NotifSpec[], kind: string) => specs.filter((s) => s.kind === kind)
+const onDay = (specs: NotifSpec[], base: number, offset: number) =>
+  specs.filter((s) => s.at !== null && dayKey(s.at) === dayKey(addDays(base, offset).getTime()))
+const text = (s: NotifSpec) => s.title + ' ' + s.body
 const placeholder = /\{\w+\}/
 const DAYS = [0, 1, 2, 3, 4, 5, 6, 7]
 
@@ -100,16 +103,17 @@ describe('buildSchedule', () => {
     expect(ofKind(specs, 'lastChance')[0].at).toBe(atTime(NOW, 0, 22, 30))
   })
 
-  it('missedYesterday before 08:00 schedules missed at 08:00; at/after 08:00 none', () => {
+  it('missedYesterday before 08:00 schedules missed at 08:00 today; at/after 08:00 none today', () => {
     const early = atTime(NOW, 0, 6)
-    const missed = ofKind(one({ missedYesterday: true, rank: 3 }, early), 'missed')
+    const missed = onDay(ofKind(one({ missedYesterday: true, rank: 3 }, early), 'missed'), early, 0)
     expect(missed).toHaveLength(1)
     expect(missed[0].at).toBe(atTime(NOW, 0, 8))
     expect(missed[0].id).toBe(notifId(0, 'missed', 0))
     expect(missed[0].largeIconTier).toBe(3)
-    expect(ofKind(one({ missedYesterday: true }, atTime(NOW, 0, 8)), 'missed')).toHaveLength(0)
-    expect(ofKind(one({ missedYesterday: true }), 'missed')).toHaveLength(0)
-    expect(ofKind(one({ missedYesterday: false }, early), 'missed')).toHaveLength(0)
+    const today = (st: Partial<HabitState>, now: number) => onDay(ofKind(one(st, now), 'missed'), now, 0)
+    expect(today({ missedYesterday: true }, atTime(NOW, 0, 8))).toHaveLength(0)
+    expect(today({ missedYesterday: true }, NOW)).toHaveLength(0)
+    expect(today({ missedYesterday: false }, early)).toHaveLength(0)
   })
 
   it('running session: ongoing running spec and dayComplete at now + remaining', () => {
@@ -186,7 +190,7 @@ describe('buildSchedule', () => {
     expect(specs.filter((s) => s.habitId === 'a').every((s) => s.id < 1000)).toBe(true)
     expect(specs.filter((s) => s.habitId === 'b').every((s) => s.id >= 1000)).toBe(true)
     expect(ofKind(specs, 'running')[0].habitId).toBe('b')
-    expect(ofKind(specs, 'missed')).toHaveLength(2)
+    expect(onDay(ofKind(specs, 'missed'), early, 0)).toHaveLength(2)
     // b is running, so its first reminder is tomorrow at its own 07:15
     expect(ofKind(specs, 'reminder').find((s) => s.habitId === 'b')!).toMatchObject({
       id: notifId(1, 'reminder', 1),
@@ -204,7 +208,17 @@ describe('buildSchedule', () => {
   })
 
   it('lastChance names dropToName = tier max(1, rank-2)', () => {
-    const texts = (rank: number) => ofKind(one({ rank }), 'lastChance').map((s) => s.title + ' ' + s.body)
+    // today's lastChance (future days use a projected rank, tested separately); many seeds via habit ids
+    const texts = (rank: number) =>
+      Array.from({ length: 30 }, (_, i) => {
+        const id = `h${i}`
+        const specs = buildSchedule({
+          habits: [{ ...makeHabit('a'), id }],
+          states: { [id]: makeState(id, NOW, { rank, earnedTier: rank }) },
+          now: NOW,
+        })
+        return text(ofKind(onDay(specs, NOW, 0), 'lastChance')[0])
+      })
     const r5 = texts(5) // Expert -> Adept
     expect(r5.some((t) => t.includes('Adept'))).toBe(true)
     expect(r5.some((t) => /Novice|Apprentice|Skilled/.test(t))).toBe(false)
@@ -216,8 +230,91 @@ describe('buildSchedule', () => {
     // 30 of 120 done today -> "1h 30m" left today; future days must say the full "2h".
     const specs = one({ todayMinutes: 30 })
     const future = specs.filter((s) => s.at !== null && dayKey(s.at) !== dayKey(NOW))
-    expect(future).toHaveLength(14)
+    expect(future).toHaveLength(21) // reminder + lastChance + missed for each of 7 days
     for (const s of future) expect(s.title + s.body).not.toContain('1h 30m')
+  })
+
+  it('future days use the projected rank (each missed day costs 2 tiers)', () => {
+    // Expert (earned 5, lost 0), today not done. Day +1: 1 miss -> Adept (drop Novice). Day +2: 2 misses -> Novice.
+    const specs = one({ rank: 5, earnedTier: 5, lostTiers: 0, todayMinutes: 0 })
+    const d1 = ofKind(onDay(specs, NOW, 1), 'lastChance')[0]
+    const d2 = ofKind(onDay(specs, NOW, 2), 'lastChance')[0]
+    expect(text(d1)).not.toMatch(/Expert|Skilled|Apprentice/)
+    expect(text(d2)).not.toMatch(/Expert|Adept|Skilled|Apprentice/)
+    expect(d1.largeIconTier).toBe(5)
+    expect(d2.largeIconTier).toBe(5)
+  })
+
+  it('projected rank names appear across seeds (day +2 Expert today-not-done -> Novice)', () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < 40; i++) {
+      const id = `h${i}`
+      const specs = buildSchedule({
+        habits: [{ ...makeHabit('a'), id }],
+        states: { [id]: makeState(id, NOW, { rank: 7, earnedTier: 7, lostTiers: 0, todayMinutes: 0 }) },
+        now: NOW,
+      })
+      // day +1: 1 miss -> Expert (5), drop Adept (3); day +2: 2 misses -> Adept (3), drop Novice (1)
+      const d1 = text(ofKind(onDay(specs, NOW, 1), 'lastChance')[0])
+      const d2 = text(ofKind(onDay(specs, NOW, 2), 'lastChance')[0])
+      expect(d1).not.toMatch(/Master|Skilled|Novice/)
+      expect(d2).not.toMatch(/Master|Expert|Skilled/)
+      for (const n of ['Expert', 'Adept', 'Novice']) if ((d1 + d2).includes(n)) seen.add(n)
+    }
+    expect(seen.has('Adept')).toBe(true)
+  })
+
+  it('projection: today done means one fewer miss before each future day', () => {
+    // Master (7), today done, day +2: only day +1 missed -> Expert (5), drop Adept (3)
+    const done = text(ofKind(onDay(one({ rank: 7, earnedTier: 7, lostTiers: 0, todayMinutes: 120 }), NOW, 2), 'lastChance')[0])
+    expect(done).not.toMatch(/Master|Skilled|Novice/)
+  })
+
+  it('schedules a morning-after-miss at 08:00 on each future day', () => {
+    const specs = one({ rank: 5, earnedTier: 5, lostTiers: 0, todayMinutes: 0 })
+    const missed = ofKind(specs, 'missed')
+    expect(missed.map((s) => s.at)).toEqual([1, 2, 3, 4, 5, 6, 7].map((d) => atTime(NOW, d, 8)))
+    expect(missed.map((s) => s.id)).toEqual([1, 2, 3, 4, 5, 6, 7].map((d) => notifId(0, 'missed', d)))
+    // day +1 follows today's miss: Expert -> Adept. Never names Expert as current.
+    expect(text(missed[0])).not.toMatch(/Expert|Novice/)
+    // day +3 onward: already Novice before the miss -> no rank lost -> no drop claim
+    for (const s of missed.slice(2)) expect(text(s)).not.toMatch(/dropped|tier back|climb back/)
+    for (const s of missed) expect(s.largeIconTier).toBe(5)
+  })
+
+  it('skips the day +1 morning-after-miss when today is done', () => {
+    const missed = ofKind(one({ todayMinutes: 120 }), 'missed')
+    expect(missed.map((s) => s.at)).toEqual([2, 3, 4, 5, 6, 7].map((d) => atTime(NOW, d, 8)))
+  })
+
+  it('morning-after-miss for a Novice never claims a drop', () => {
+    for (let i = 0; i < 40; i++) {
+      const id = `h${i}`
+      const specs = buildSchedule({
+        habits: [{ ...makeHabit('a'), id }],
+        states: { [id]: makeState(id, atTime(NOW, 0, 6), { rank: 1, earnedTier: 1, todayMinutes: 0, missedYesterday: true }) },
+        now: atTime(NOW, 0, 6),
+      })
+      const missed = ofKind(specs, 'missed')
+      expect(missed).toHaveLength(8)
+      for (const s of missed) expect(text(s)).not.toMatch(/dropped|tier back|climb back/)
+    }
+  })
+
+  it('no reminder when reminderTime is at or after 22:30 (lastChance covers it)', () => {
+    const at = (t: string) => one({}, NOW, undefined, makeHabit('a', 1000, { reminderTime: t }))
+    expect(ofKind(at('22:45'), 'reminder')).toHaveLength(0)
+    expect(ofKind(at('22:45'), 'lastChance')).toHaveLength(8)
+    expect(ofKind(at('22:30'), 'reminder')).toHaveLength(0)
+    expect(ofKind(at('22:29'), 'reminder')).toHaveLength(8)
+  })
+
+  it('clamps horizonDays to 99 so ids never collide', () => {
+    const specs = buildSchedule({ habits: [makeHabit('a')], states: { a: makeState('a') }, now: NOW, horizonDays: 500 })
+    expect(ofKind(specs, 'reminder')).toHaveLength(100)
+    const ids = specs.map((s) => s.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(Math.max(...ids)).toBeLessThan(1000)
   })
 
   it('honours horizonDays', () => {

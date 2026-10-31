@@ -51,6 +51,16 @@ the system *Alarms & reminders* screen; the state is re-checked when you return 
 `VIBRATE` (haptics). The local-notifications plugin
 adds `RECEIVE_BOOT_COMPLETED` / `WAKE_LOCK` itself (reschedules after reboot).
 
+On Android 13+ nothing is shown until the notification permission is granted. The app asks right after the
+first habit is saved, and while it has never been asked Home shows a "Turn on reminders" banner with an
+**Enable** button (Settings → *Notifications* has one too).
+
+### Reminder horizon
+
+Reminders are scheduled locally **7 days ahead** and the whole plan is rebuilt whenever the app opens or
+resumes (and after any change). There is no background job: if the app is not opened for more than 7 days,
+the scheduled reminders run out and stop until it is opened again.
+
 ## Installing the APK on a phone
 
 **USB (adb):** enable *Developer options → USB debugging* on the phone, connect it, then
@@ -76,7 +86,7 @@ To be run by a person on a real phone with the debug APK. Tick each item and not
 
 Phone / Android version: ________
 
-- [ ] **Permission prompt on first launch** — on Android 13+ the notification permission prompt appears (or the in-app enable button triggers it); granting it enables reminders.
+- [ ] **Permission prompt** — on Android 13+ (fresh install) the notification permission prompt appears right after saving the first habit (or via the Home "Turn on reminders" banner / Settings **Enable**); granting it enables reminders.
 - [ ] **Exact alarms** — on Android 12+/14+, if Settings → *Exact reminders* shows **Enable** (and Home shows the "Reminders may be late" banner), tap it, allow *Alarms & reminders* for SkillUp, return: the row shows **On** and the banner is gone.
 - [ ] **Reminder while killed** — set a reminder 2 minutes ahead, swipe the app away from recents; the reminder arrives on time showing the habit's rank emblem (large icon) and the flame in the status bar.
 - [ ] **Running-session notification** — start a timer: an ongoing (non-dismissable) notification appears; its **Stop** action stops the session and the app reflects it.

@@ -24,9 +24,12 @@ export function daysBetween(fromKey: DayKey, toKey: DayKey): DayKey[] {
   return out
 }
 
-/** Whole minutes per local day; sessions split at midnight, open sessions end at `now`. */
+/**
+ * Whole minutes per local day; sessions split at midnight, open sessions end at `now`.
+ * Milliseconds are summed per day across all sessions and floored to minutes once per day.
+ */
 export function minutesByDay(sessions: Session[], now: number): Map<DayKey, number> {
-  const result = new Map<DayKey, number>()
+  const ms = new Map<DayKey, number>()
   for (const s of sessions) {
     const end = s.end ?? now
     if (end <= s.start) continue
@@ -35,11 +38,15 @@ export function minutesByDay(sessions: Session[], now: number): Map<DayKey, numb
     while (segStart < end) {
       const boundary = dayStart(nextDay(key))
       const segEnd = Math.min(end, boundary)
-      const mins = Math.floor((segEnd - segStart) / 60000)
-      if (mins > 0) result.set(key, (result.get(key) ?? 0) + mins)
+      ms.set(key, (ms.get(key) ?? 0) + (segEnd - segStart))
       segStart = segEnd
       key = nextDay(key)
     }
+  }
+  const result = new Map<DayKey, number>()
+  for (const [key, total] of ms) {
+    const mins = Math.floor(total / 60000)
+    if (mins > 0) result.set(key, mins)
   }
   return result
 }

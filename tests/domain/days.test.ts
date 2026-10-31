@@ -33,6 +33,20 @@ describe('days', () => {
     expect(Object.fromEntries(m)).toEqual({ '2026-10-31': 45 })
   })
 
+  it('floors minutes once per day, not per session', () => {
+    const s1 = at(2026, 10, 31, 9)
+    const s2 = at(2026, 10, 31, 14)
+    const len = 60 * 60000 + 30000
+    const m = minutesByDay(
+      [
+        { id: 'a', habitId: 'h', start: s1, end: s1 + len },
+        { id: 'b', habitId: 'h', start: s2, end: s2 + len },
+      ],
+      0,
+    )
+    expect(Object.fromEntries(m)).toEqual({ '2026-10-31': 121 })
+  })
+
   it('daysBetween is inclusive', () => {
     expect(daysBetween('2026-10-30', '2026-11-02')).toEqual(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02'])
   })

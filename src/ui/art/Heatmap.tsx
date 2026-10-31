@@ -58,7 +58,7 @@ export function Heatmap({ days, month, color, today, className }: Props) {
     <div role="grid" aria-label={format(first, 'MMMM yyyy')} className={`select-none ${className ?? ''}`}>
       <div className="mb-1 grid grid-cols-7 gap-1.5" aria-hidden>
         {WEEKDAYS.map((w, i) => (
-          <div key={i} className="text-center font-display text-[10px] font-semibold text-white/30">
+          <div key={i} className="text-center font-display text-[10px] font-semibold text-muted">
             {w}
           </div>
         ))}
@@ -97,25 +97,22 @@ function Cell({
 
   if (status === 'done') {
     style = overtime
-      ? {
-          background: `radial-gradient(circle at 35% 30%, #ffffff 0%, ${color} 45%, ${color} 100%)`,
-          boxShadow: `0 0 10px ${color}cc, inset 0 0 0 1.5px #ffe27a`,
-        }
-      : { background: `linear-gradient(145deg, ${color}, ${color}cc)`, boxShadow: `0 0 6px ${color}55` }
+      ? { background: color, boxShadow: 'inset 0 0 0 1.5px rgb(var(--line)), inset 0 0 0 3.5px #f5b324' }
+      : { background: color, boxShadow: 'inset 0 0 0 1.5px rgb(var(--line))' }
   } else if (status === 'missed') {
-    style = { background: 'rgba(255, 60, 80, 0.12)', boxShadow: 'inset 0 0 0 1px rgba(255,80,96,0.35)' }
+    style = { background: 'rgb(var(--sunk))', boxShadow: 'inset 0 0 0 1.5px rgb(var(--danger) / 0.5)' }
     inner = (
       <svg viewBox="0 0 10 10" className="h-1/2 w-1/2" aria-hidden>
-        <path d="M2 2 L8 8 M8 2 L2 8" stroke="#ff4d5e" strokeWidth="2" strokeLinecap="round" />
+        <path d="M2 2 L8 8 M8 2 L2 8" stroke="rgb(var(--danger))" strokeWidth="2" strokeLinecap="round" />
       </svg>
     )
   } else if (status === 'pending' || status === 'grace') {
     const partial = !!rec && rec.minutes > 0
-    style = { background: color, opacity: partial ? 0.35 : 0.14 }
+    style = { background: partial ? color : 'rgb(var(--sunk))', opacity: partial ? 0.5 : 1, boxShadow: 'inset 0 0 0 1.5px rgb(var(--line) / 0.35)' }
   } else if (status === 'future') {
-    style = { boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.12)' }
+    style = { boxShadow: 'inset 0 0 0 1.5px rgb(var(--line) / 0.2)' }
   } else {
-    style = { background: 'rgba(255,255,255,0.03)' }
+    style = { background: 'rgb(var(--sunk) / 0.5)' }
   }
 
   return (
@@ -124,7 +121,7 @@ function Cell({
       aria-label={label}
       data-status={status}
       data-overtime={overtime || undefined}
-      className={`relative flex aspect-square items-center justify-center rounded-md ${isToday ? 'outline outline-2 outline-offset-1 outline-white/70' : ''}`}
+      className={`relative flex aspect-square items-center justify-center rounded-[10px] ${isToday ? 'outline outline-2 outline-offset-2 outline-ink' : ''}`}
       style={style}
     >
       {inner}

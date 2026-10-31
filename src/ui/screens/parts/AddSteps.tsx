@@ -13,13 +13,6 @@ export function NameStep(p: {
 }) {
   return (
     <div className="flex flex-col items-center gap-5">
-      <div
-        className="grid h-24 w-24 place-items-center rounded-[28px] text-5xl"
-        style={{ background: `radial-gradient(circle at 35% 30%, ${p.color}aa, ${p.color}33)`, boxShadow: `0 0 40px ${p.color}55` }}
-        aria-hidden
-      >
-        {HABIT_ICONS[p.icon]}
-      </div>
       <input
         aria-label="Name"
         value={p.name}
@@ -27,7 +20,7 @@ export function NameStep(p: {
         autoFocus
         placeholder="Guitar, Coding, Spanish…"
         onChange={(e) => p.onName(e.target.value)}
-        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-center font-display text-2xl font-semibold outline-none placeholder:text-white/25 focus:border-white/30"
+        className="w-full rounded-full border-[1.5px] border-line bg-surface px-5 py-4 text-center font-display text-xl font-bold outline-none placeholder:font-semibold placeholder:text-muted/60 focus:ring-2 focus:ring-accent"
       />
       <div role="radiogroup" aria-label="Icon" className="grid grid-cols-6 gap-2">
         {ICON_IDS.map((id) => (
@@ -38,11 +31,10 @@ export function NameStep(p: {
             aria-checked={p.icon === id}
             aria-label={id}
             onClick={() => p.onIcon(id)}
-            className="grid h-12 w-12 place-items-center rounded-2xl text-2xl transition active:scale-90"
-            style={{
-              background: p.icon === id ? `${p.color}44` : 'rgba(255,255,255,.05)',
-              boxShadow: p.icon === id ? `inset 0 0 0 2px ${p.color}` : undefined,
-            }}
+            className={`grid h-12 w-12 place-items-center rounded-2xl border-[1.5px] text-2xl transition active:scale-90 ${
+              p.icon === id ? 'border-line' : 'border-transparent bg-sunk'
+            }`}
+            style={p.icon === id ? { background: p.color } : undefined}
           >
             {HABIT_ICONS[id]}
           </button>
@@ -60,12 +52,11 @@ export function NameStep(p: {
             className="grid h-11 w-11 place-items-center rounded-full active:scale-90"
           >
             <span
-              className="h-8 w-8 rounded-full transition"
-              style={{
-                background: c,
-                boxShadow: p.color === c ? `0 0 0 3px #0b0b12, 0 0 0 5px ${c}, 0 0 16px ${c}` : undefined,
-              }}
-            />
+              className={`grid h-9 w-9 place-items-center rounded-full border-[1.5px] border-line transition ${p.color === c ? 'scale-110' : ''}`}
+              style={{ background: c }}
+            >
+              {p.color === c && <span className="text-on-tint"><Glyph name="check" size={16} /></span>}
+            </span>
           </button>
         ))}
       </div>
@@ -81,18 +72,17 @@ export function TargetStep(p: { value: number; min: number; color: string; onCha
   const set = (v: number) => p.onChange(Math.max(p.min, Math.round(v)))
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="text-6xl" aria-hidden>🏆</div>
       <div className="flex items-center gap-5">
-        <button type="button" aria-label="Less" onClick={() => set(p.value - step)} className="grid h-14 w-14 place-items-center rounded-full bg-white/10 active:scale-90">
+        <button type="button" aria-label="Less" onClick={() => set(p.value - step)} className="grid h-14 w-14 place-items-center rounded-full border-[1.5px] border-line bg-surface active:scale-90">
           <Glyph name="minus" size={26} />
         </button>
         <div className="flex min-w-[150px] flex-col items-center">
-          <span className="font-display text-5xl font-bold tabular-nums" style={{ textShadow: `0 0 24px ${p.color}` }}>
+          <span className="font-display text-5xl font-bold tabular-nums">
             {fmtInt(p.value)}
           </span>
-          <span className="text-sm text-white/50">hours</span>
+          <span className="label">hours to master</span>
         </div>
-        <button type="button" aria-label="More" onClick={() => set(p.value + step)} className="grid h-14 w-14 place-items-center rounded-full bg-white/10 active:scale-90">
+        <button type="button" aria-label="More" onClick={() => set(p.value + step)} className="grid h-14 w-14 place-items-center rounded-full border-[1.5px] border-line bg-surface active:scale-90">
           <Glyph name="plus" size={26} />
         </button>
       </div>
@@ -103,8 +93,10 @@ export function TargetStep(p: { value: number; min: number; color: string; onCha
             type="button"
             aria-label={`${h} hours`}
             onClick={() => set(h)}
-            className="h-11 min-w-[56px] rounded-full px-4 font-display font-semibold active:scale-90"
-            style={{ background: p.value === h ? p.color : 'rgba(255,255,255,.07)', color: p.value === h ? '#0b0b12' : undefined }}
+            className={`h-11 min-w-[60px] rounded-full border-[1.5px] px-4 font-display font-bold active:scale-90 ${
+              p.value === h ? 'border-line text-on-tint' : 'border-transparent bg-sunk'
+            }`}
+            style={p.value === h ? { background: p.color } : undefined}
           >
             {short(h)}
           </button>
@@ -117,14 +109,13 @@ export function TargetStep(p: { value: number; min: number; color: string; onCha
 export function ReminderStep(p: { value: string; color: string; onChange(v: string): void }) {
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="text-6xl" aria-hidden>🔔</div>
+      <p className="max-w-[260px] text-center text-sm text-muted">A nudge at this time if today isn't done yet, plus a last call at 22:30.</p>
       <input
         type="time"
         aria-label="Reminder time"
         value={p.value}
         onChange={(e) => p.onChange(e.target.value)}
-        className="rounded-3xl border-2 bg-white/5 px-6 py-4 font-display text-5xl font-bold tabular-nums outline-none [color-scheme:dark]"
-        style={{ borderColor: p.color }}
+        className="rounded-[28px] border-[1.5px] border-line bg-surface px-6 py-4 font-display text-5xl font-bold tabular-nums text-ink outline-none focus:ring-2 focus:ring-accent"
       />
     </div>
   )

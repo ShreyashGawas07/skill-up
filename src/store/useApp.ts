@@ -6,6 +6,7 @@ import { evaluate, isStale } from '@/domain/evaluate'
 import { dayKey, nextDay } from '@/domain/days'
 import type { Habit, HabitState, Session } from '@/domain/types'
 import { buildSchedule } from '@/notify/plan'
+import { pastel } from '@/ui/theme'
 import { applySchedule, registerNotificationActions } from '@/notify/scheduler'
 import { celebrationKey, toCelebrations } from '@/feedback/celebrations'
 import type { Celebration } from '@/feedback/celebrations'
@@ -33,6 +34,8 @@ export interface AppStore {
   states: Record<string, HabitState>
   running?: Session
   queue: Celebration[]
+  /** True once the first load() has read the DB (UI shows no empty state before then). */
+  ready: boolean
   now: number
   load(): Promise<void>
   tick(now: number): void
@@ -49,6 +52,10 @@ export interface AppStore {
   /** Re-reads habits and sessions from the DB, recomputes, and reschedules. */
   refresh(): Promise<void>
 }
+
+/** Habits as read from the DB, with v1 colours mapped onto the pastel palette. */
+const readHabits = async (): Promise<Habit[]> =>
+  (await repo.listHabits()).map((h) => (pastel(h.color) === h.color ? h : { ...h, color: pastel(h.color) }))
 
 let clock: () => number = () => Date.now()
 /** Test hook: replaces the time source used by every store action. */
@@ -127,7 +134,7 @@ export const useApp = create<AppStore>()((set, get) => {
 
   /** Re-reads habits and sessions, recomputes everything, and reschedules notifications. */
   async function refresh(): Promise<void> {
-    const [habits, sessions] = await Promise.all([repo.listHabits(), repo.listSessions()])
+    const [habits, sessions] = await Promise.all([readHabits(), repo.listSessions()])
     const now = clock()
     set({ habits, sessions, ...derive(habits, sessions, now) })
     if (await stopEternalTimer(now)) return refresh()
@@ -167,11 +174,12 @@ export const useApp = create<AppStore>()((set, get) => {
     states: {},
     running: undefined,
     queue: [],
+    ready: false,
     now: clock(),
 
     async load() {
       const [habits, sessions, settings, seenKeys] = await Promise.all([
-        repo.listHabits(), repo.listSessions(), repo.getSettings(), repo.seenKeys(),
+        readHabits(), repo.listSessions(), repo.getSettings(), repo.seenKeys(),
       ])
       seen = seenKeys
       const now = clock()
@@ -186,7 +194,7 @@ export const useApp = create<AppStore>()((set, get) => {
         await repo.markSeen(keys)
         keys.forEach((k) => seen.add(k))
       }
-      set({ habits, sessions, settings, ...derive(habits, sessions, now) })
+      set({ habits, sessions, settings, ready: true, ...derive(habits, sessions, now) })
       hookNative()
       if (await stopEternalTimer(now)) return refresh()
       await reschedule()

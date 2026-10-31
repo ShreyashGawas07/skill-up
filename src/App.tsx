@@ -8,12 +8,14 @@ import { HallOfFame } from '@/ui/screens/HallOfFame'
 import { Settings } from '@/ui/screens/Settings'
 import { CelebrationOverlay } from '@/ui/overlay/CelebrationOverlay'
 import { StaleSessionDialog } from '@/ui/overlay/StaleSessionDialog'
+import { useTheme } from '@/ui/useTheme'
 
 export default function App() {
   const [route, setRoute] = useState<Route>('home')
   const load = useApp((s) => s.load)
   const tick = useApp((s) => s.tick)
   const isRunning = useApp((s) => !!s.running)
+  useTheme(useApp((s) => s.settings.theme))
 
   useEffect(() => {
     void load().catch((e) => console.error('Load failed', e))
@@ -26,18 +28,23 @@ export default function App() {
     return () => clearInterval(id)
   }, [isRunning, tick])
 
+  // Each screen opens at its top, not at the previous screen's scroll position.
+  useEffect(() => {
+    window.scrollTo?.(0, 0)
+  }, [route])
+
   const home = () => setRoute('home')
   const [kind, id] = route.split(':') as [string, string | undefined]
 
   return (
-    <div className="min-h-screen bg-[#0b0b12] text-white">
+    <div className="min-h-screen bg-bg text-ink">
       <CelebrationOverlay />
       <StaleSessionDialog />
       {kind === 'home' && <Home onNavigate={setRoute} />}
       {kind === 'add' && <AddHabit onDone={home} />}
       {kind === 'edit' && <AddHabit key={id} habitId={id} onDone={home} />}
       {kind === 'detail' && id && <HabitDetail key={id} habitId={id} onNavigate={setRoute} />}
-      {kind === 'settings' && <Settings onBack={home} />}
+      {kind === 'settings' && <Settings onNavigate={setRoute} />}
       {kind === 'hall' && <HallOfFame onNavigate={setRoute} />}
     </div>
   )

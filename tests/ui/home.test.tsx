@@ -94,7 +94,7 @@ describe('HabitCard', () => {
     expect(screen.getByRole('img', { name: 'Apprentice' })).toBeInTheDocument()
     expect(screen.getByTestId('progress')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '7 day streak' })).toBeInTheDocument()
-    expect(screen.getByText('7')).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Guitar' })).getByText('7')).toBeInTheDocument()
     expect(screen.getByText('Day 12/30')).toBeInTheDocument()
     expect(screen.getByText('312 / 10,000h')).toBeInTheDocument()
   })

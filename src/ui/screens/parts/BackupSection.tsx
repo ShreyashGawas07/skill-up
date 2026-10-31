@@ -8,7 +8,7 @@ import { Glyph } from './Glyphs'
 import { backupFileName, saveBackupFile } from './backupFile'
 
 const tile =
-  'flex min-h-[96px] flex-1 flex-col items-center justify-center gap-2 rounded-3xl bg-white/[0.05] font-semibold active:scale-95 disabled:opacity-50'
+  'flex min-h-[96px] flex-1 flex-col items-center justify-center gap-2 rounded-[22px] border-[1.5px] border-line bg-surface font-display font-bold active:scale-95 disabled:opacity-50'
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -98,12 +98,12 @@ export function BackupSection({ reducedMotion }: { reducedMotion?: boolean }) {
         />
       </div>
       {error && (
-        <p role="alert" className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <p role="alert" className="rounded-[18px] border-[1.5px] border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </p>
       )}
       {done && (
-        <p role="status" className="flex items-center gap-2 px-1 text-sm text-[#69db7c]">
+        <p role="status" className="flex items-center gap-2 px-1 text-sm font-semibold text-[#2f8a4f]">
           <Glyph name="check" size={16} />
           {done}
         </p>

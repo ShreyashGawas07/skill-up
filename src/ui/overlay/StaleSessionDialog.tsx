@@ -75,41 +75,41 @@ export function StaleSessionDialog() {
     }
   }
 
-  const btn = 'w-full rounded-2xl py-3.5 font-display text-base font-bold active:scale-[0.98] disabled:opacity-50'
+  const btn = 'w-full rounded-full border-[1.5px] border-line py-3.5 font-display text-base font-bold active:scale-[0.98] disabled:opacity-50'
 
   return (
-    <motion.div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <motion.div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#28221e]/50 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <motion.div
         role="dialog"
         aria-modal="true"
         aria-labelledby="stale-title"
         onKeyDown={trap}
-        className="mb-4 w-[calc(100%-32px)] max-w-sm rounded-3xl border border-white/10 bg-[#15151f] p-6"
+        className="mb-4 w-[calc(100%-32px)] max-w-sm rounded-[28px] border-[1.5px] border-line bg-surface p-6"
         initial={reduce ? { opacity: 0 } : { y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 24 }}
       >
         <div className="mb-4 flex items-center gap-3">
-          <span aria-hidden className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl" style={{ background: `${habit?.color ?? '#ffffff'}26` }}>
+          <span aria-hidden className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border-[1.5px] border-line text-2xl" style={{ background: habit?.color ?? "#f8d77c" }}>
             {iconGlyph(habit?.icon ?? '')}
           </span>
           <div>
             <h2 id="stale-title" className="font-display text-xl font-bold">Did you forget to stop?</h2>
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-muted">
               {habit?.name ?? 'Timer'} · started {format(stale.start, 'EEE h:mm a')}
             </p>
           </div>
         </div>
 
-        <button ref={keepRef} type="button" disabled={busy} className={`${btn} bg-gradient-to-r from-[#9775fa] to-[#4dabf7] text-white`} onClick={() => void resolve(stale.start + MAX_MIN * MIN)}>
+        <button ref={keepRef} type="button" disabled={busy} className={`${btn} bg-accent text-on-tint`} onClick={() => void resolve(stale.start + MAX_MIN * MIN)}>
           Keep 16h
         </button>
 
-        <div className="mt-5 rounded-2xl bg-white/5 p-4">
+        <div className="mt-5 rounded-[22px] border-[1.5px] border-line/30 bg-sunk p-4">
           <div className="mb-2 flex items-baseline justify-between">
-            <span className="text-sm text-white/60">Stopped at</span>
+            <span className="text-sm text-muted">Stopped at</span>
             <span className="font-display text-lg font-bold tabular-nums">
-              {stopLabel} <span className="text-sm font-medium text-white/50">({fmtDur(picked)})</span>
+              {stopLabel} <span className="text-sm font-medium text-muted">({fmtDur(picked)})</span>
             </span>
           </div>
           <input
@@ -122,14 +122,14 @@ export function StaleSessionDialog() {
             value={picked}
             onChange={(e) => setMins(Number(e.target.value))}
             className="h-11 w-full cursor-pointer"
-            style={{ accentColor: habit?.color ?? '#9775fa' }}
+            style={{ accentColor: 'rgb(var(--ink))' }}
           />
-          <button type="button" disabled={busy} className={`${btn} mt-2 bg-white/10 text-white`} onClick={() => void resolve(stopAt)}>
+          <button type="button" disabled={busy} className={`${btn} mt-2 bg-surface text-ink`} onClick={() => void resolve(stopAt)}>
             Stop at {stopLabel}
           </button>
         </div>
         {error && (
-          <p role="alert" className="mt-3 text-center text-sm text-[#ff8787]">
+          <p role="alert" className="mt-3 text-center text-sm text-danger">
             Couldn't save the stop time. Please try again.
           </p>
         )}

@@ -5,6 +5,7 @@ import { haptic } from '@/feedback/haptics'
 import { notificationPermission, requestNotificationPermission } from '@/notify/scheduler'
 import { useReduce } from '@/ui/art/useReduce'
 import { HABIT_COLORS } from '@/ui/theme'
+import { iconGlyph } from '@/ui/icons'
 import { DIAL_MAX, DIAL_MIN, DIAL_STEP, HoursDial } from './parts/HoursDial'
 import { NameStep, ReminderStep, TargetStep } from './parts/AddSteps'
 import { Glyph } from './parts/Glyphs'
@@ -35,6 +36,7 @@ export function validateHabitInput(input: Partial<HabitInput>, ctx: ValidateCtx)
 }
 
 const STEPS = 4
+const TITLES = ['Name your habit', 'Daily commitment', 'Mastery goal', 'Daily reminder']
 const SWIPE = 70
 
 interface Props {
@@ -150,75 +152,93 @@ export function AddHabit({ habitId, onDone }: Props) {
   const shownErr = err ?? (step > 0 ? stepError : null)
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-6 pt-4">
-      <header className="flex items-center justify-between">
-        <button type="button" aria-label="Close" onClick={onDone} className="grid h-11 w-11 place-items-center rounded-full bg-white/5 active:scale-90">
-          <span className="text-xl leading-none" aria-hidden>✕</span>
-        </button>
-        <div className="flex gap-2" aria-label={`Step ${step + 1} of ${STEPS}`} role="progressbar" aria-valuenow={step + 1} aria-valuemin={1} aria-valuemax={STEPS}>
-          {Array.from({ length: STEPS }, (_, i) => (
-            <motion.span
-              key={i}
-              className="h-2 rounded-full"
-              // Reduce-motion: the width snaps (static style); only the colour fades.
-              style={reduce ? { width: i === step ? 28 : 8 } : undefined}
-              animate={
-                reduce
-                  ? { backgroundColor: i <= step ? v.color : 'rgba(255,255,255,.15)' }
-                  : { width: i === step ? 28 : 8, backgroundColor: i <= step ? v.color : 'rgba(255,255,255,.15)' }
-              }
-            />
-          ))}
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
+      <div className="px-4 pb-10 pt-[max(8px,env(safe-area-inset-top))] text-on-tint transition-colors" style={{ background: v.color }}>
+        <header className="flex h-14 items-center justify-between">
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onDone}
+            className="grid h-10 w-10 place-items-center rounded-full border-[1.5px] border-on-tint bg-accent text-on-tint active:scale-90"
+          >
+            <Glyph name="close" size={18} />
+          </button>
+          <div className="flex gap-1.5" aria-label={`Step ${step + 1} of ${STEPS}`} role="progressbar" aria-valuenow={step + 1} aria-valuemin={1} aria-valuemax={STEPS}>
+            {Array.from({ length: STEPS }, (_, i) => (
+              <motion.span
+                key={i}
+                className="h-2.5 rounded-full border-[1.5px] border-on-tint"
+                // Reduce-motion: the width snaps (static style); only the colour fades.
+                style={reduce ? { width: i === step ? 28 : 8 } : undefined}
+                animate={
+                  reduce
+                    ? { backgroundColor: i <= step ? '#28221e' : 'rgba(255,255,255,.5)' }
+                    : { width: i === step ? 28 : 8, backgroundColor: i <= step ? '#28221e' : 'rgba(255,255,255,.5)' }
+                }
+              />
+            ))}
+          </div>
+          <span className="w-10" />
+        </header>
+        <div className="mt-3 flex items-center gap-4">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] border-[1.5px] border-on-tint bg-white/50 text-4xl" aria-hidden>
+            {iconGlyph(v.icon)}
+          </span>
+          <div className="min-w-0">
+            <p className="font-display text-xs font-bold uppercase tracking-[0.14em] opacity-70">{editing ? 'Edit habit' : 'New habit'}</p>
+            <p className="truncate font-display text-2xl font-bold">{TITLES[step]}</p>
+          </div>
         </div>
-        <span className="w-11" />
-      </header>
+      </div>
 
-      {/* Outer layer handles the swipe; the keyed inner layer animates each step in. */}
-      <motion.div
-        className="flex flex-1 touch-pan-y flex-col justify-center py-6"
-        drag={step === 1 ? false : 'x'}
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.4}
-        dragSnapToOrigin
-        onDragEnd={(_, info) => {
-          if (info.offset.x < -SWIPE) go(1)
-          else if (info.offset.x > SWIPE) go(-1)
-        }}
-      >
+      <div className="-mt-6 flex flex-1 flex-col rounded-t-[28px] border-t-[1.5px] border-line bg-bg px-4 pb-[max(20px,env(safe-area-inset-bottom))]">
+        {/* Outer layer handles the swipe; the keyed inner layer animates each step in. */}
         <motion.div
-          key={step}
-          initial={reduce ? { opacity: 0 } : { opacity: 0, x: dir * 120 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+          className="flex flex-1 touch-pan-y flex-col justify-center py-6"
+          drag={step === 1 ? false : 'x'}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.4}
+          dragSnapToOrigin
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -SWIPE) go(1)
+            else if (info.offset.x > SWIPE) go(-1)
+          }}
         >
-          {body}
+          <motion.div
+            key={step}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, x: dir * 120 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+          >
+            {body}
+          </motion.div>
         </motion.div>
-      </motion.div>
 
-      <p role={shownErr ? 'alert' : undefined} className="mb-3 min-h-[1.25rem] text-center text-sm text-[#ff8787]">
-        {shownErr}
-      </p>
+        <p role={shownErr ? 'alert' : undefined} className="mb-3 min-h-[1.25rem] text-center text-sm font-medium text-danger">
+          {shownErr}
+        </p>
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          aria-label="Back"
-          disabled={step === 0}
-          onClick={() => go(-1)}
-          className="grid h-16 w-16 place-items-center rounded-2xl bg-white/5 active:scale-95 disabled:opacity-0"
-        >
-          <Glyph name="back" size={26} />
-        </button>
-        <button
-          type="button"
-          aria-label={last ? 'Save' : 'Next'}
-          disabled={!!stepError || saving}
-          onClick={() => (last ? void save() : go(1))}
-          className="flex h-16 flex-1 items-center justify-center rounded-2xl font-display text-lg font-bold text-[#0b0b12] transition active:scale-95 disabled:opacity-40"
-          style={{ background: `linear-gradient(135deg, #ffffff, ${v.color})`, boxShadow: `0 8px 30px ${v.color}55` }}
-        >
-          <Glyph name={last ? 'check' : 'next'} size={30} />
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            aria-label="Back"
+            disabled={step === 0}
+            onClick={() => go(-1)}
+            className="grid h-14 w-14 place-items-center rounded-full border-[1.5px] border-line bg-surface active:scale-95 disabled:opacity-0"
+          >
+            <Glyph name="back" size={22} />
+          </button>
+          <button
+            type="button"
+            aria-label={last ? 'Save' : 'Next'}
+            disabled={!!stepError || saving}
+            onClick={() => (last ? void save() : go(1))}
+            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full border-[1.5px] border-line bg-accent font-display text-base font-bold text-on-tint transition active:scale-95 disabled:opacity-40"
+          >
+            <span aria-hidden>{last ? (editing ? 'Save changes' : 'Create habit') : 'Continue'}</span>
+            <Glyph name={last ? 'check' : 'next'} size={20} />
+          </button>
+        </div>
       </div>
     </div>
   )

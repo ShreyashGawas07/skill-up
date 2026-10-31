@@ -61,7 +61,7 @@ export function HoursDial({ value, onChange, color, disabled, size = 260 }: Prop
       aria-label={`${d > 0 ? '+' : '-'}15 minutes`}
       disabled={disabled || (d > 0 ? value >= DIAL_MAX : value <= DIAL_MIN)}
       onClick={() => set(value + d)}
-      className="grid h-16 w-16 place-items-center rounded-full bg-white/10 text-white active:scale-90 disabled:opacity-30"
+      className="grid h-14 w-14 place-items-center rounded-full border-[1.5px] border-line bg-surface text-ink active:scale-90 disabled:opacity-30"
     >
       <Glyph name={name} size={28} />
     </button>
@@ -79,7 +79,7 @@ export function HoursDial({ value, onChange, color, disabled, size = 260 }: Prop
         aria-valuetext={`${fmtHM(value)} per day`}
         aria-disabled={disabled || undefined}
         onKeyDown={onKey}
-        className={`relative touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${disabled ? 'opacity-50' : ''}`}
+        className={`relative touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ink/60 ${disabled ? 'opacity-50' : ''}`}
         style={{ width: size, height: size }}
       >
         <svg
@@ -98,11 +98,12 @@ export function HoursDial({ value, onChange, color, disabled, size = 260 }: Prop
           onPointerUp={() => (dragging.current = false)}
           onPointerCancel={() => (dragging.current = false)}
         >
-          <circle cx={c} cy={c} r={r} fill="none" stroke="#fff" strokeOpacity={0.08} strokeWidth={22} />
+          <circle cx={c} cy={c} r={r} fill="none" stroke="rgb(var(--line))" strokeWidth={26} />
+          <circle cx={c} cy={c} r={r} fill="none" stroke="rgb(var(--surface))" strokeWidth={23} />
           {Array.from({ length: 12 }, (_, i) => {
             const a = (i / 12) * 2 * Math.PI - Math.PI / 2
             return (
-              <circle key={i} cx={c + r * Math.cos(a)} cy={c + r * Math.sin(a)} r={2} fill="#fff" fillOpacity={0.35} />
+              <circle key={i} cx={c + r * Math.cos(a)} cy={c + r * Math.sin(a)} r={2} fill="rgb(var(--ink))" fillOpacity={0.35} />
             )
           })}
           <circle
@@ -110,23 +111,34 @@ export function HoursDial({ value, onChange, color, disabled, size = 260 }: Prop
             cy={c}
             r={r}
             fill="none"
-            stroke={color}
-            strokeWidth={22}
+            stroke="rgb(var(--line))"
+            strokeWidth={21}
             strokeLinecap="round"
             strokeDasharray={`${frac * circ} ${circ}`}
             transform={`rotate(-90 ${c} ${c})`}
-            style={{ filter: `drop-shadow(0 0 8px ${color})` }}
           />
-          <circle cx={kx} cy={ky} r={20} fill="#fff" stroke={color} strokeWidth={6} />
+          <circle
+            cx={c}
+            cy={c}
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth={18}
+            strokeLinecap="round"
+            strokeDasharray={`${frac * circ} ${circ}`}
+            transform={`rotate(-90 ${c} ${c})`}
+          />
+          <circle cx={kx} cy={ky} r={17} fill={color} stroke="rgb(var(--line))" strokeWidth={2} />
+          <circle cx={kx} cy={ky} r={5} fill="rgb(var(--ink))" />
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           {disabled && (
-            <span className="mb-1 text-white/70">
+            <span className="mb-1 text-muted">
               <Glyph name="lock" size={22} label="Locked until formed" />
             </span>
           )}
           <span className="font-display text-6xl font-bold tabular-nums">{fmtHM(value)}</span>
-          <span className="text-sm text-white/50">/ day</span>
+          <span className="label">per day</span>
         </div>
       </div>
       <div className="flex gap-10">

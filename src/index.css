@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Semantic colour tokens as RGB triples so Tailwind's /<alpha> modifiers work. */
+:root {
+  --bg: 250 244 232;
+  --surface: 255 251 243;
+  --sunk: 242 233 216;
+  --ink: 40 34 30;
+  --muted: 110 100 89;
+  --line: 40 34 30;
+  --soft-line: 40 34 30;
+  --accent: 248 199 74;
+  --on-tint: 40 34 30;
+  --danger: 214 84 72;
+  --panel: 36 31 27;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: 21 19 17;
+  --surface: 31 28 25;
+  --sunk: 42 38 34;
+  --ink: 244 237 226;
+  --muted: 160 150 137;
+  --line: 120 109 96;
+  --soft-line: 244 237 226;
+  --accent: 248 199 74;
+  --on-tint: 40 34 30;
+  --danger: 240 128 112;
+  --panel: 9 8 7;
+  color-scheme: dark;
+}
+
 @layer base {
   html,
   body,
@@ -9,6 +40,27 @@
     min-height: 100%;
   }
   body {
-    @apply bg-[#0b0b12] font-body text-white antialiased;
+    @apply bg-bg font-body text-ink antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--ink));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Outlined card, the base surface of the app. */
+  .card {
+    @apply rounded-[22px] border-[1.5px] border-line bg-surface;
+  }
+  .label {
+    @apply font-display text-[11px] font-bold uppercase tracking-[0.12em] text-muted;
+  }
+  .pill-btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border-[1.5px] border-line px-5 font-display text-sm font-bold transition-transform active:scale-95 disabled:opacity-40;
   }
 }

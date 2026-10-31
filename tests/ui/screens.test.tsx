@@ -138,7 +138,7 @@ describe('HabitDetail', () => {
 
     expect(screen.getByRole('group', { name: 'Total hours' })).toHaveTextContent('312h')
     expect(screen.getByRole('group', { name: 'Longest streak' })).toHaveTextContent('21')
-    expect(screen.getByRole('group', { name: 'Overtime' })).toHaveTextContent('2:15')
+    expect(screen.getByRole('group', { name: 'Overtime' })).toHaveTextContent('2h 15m')
   })
 
   it('badge cabinet shows Formed + reached tiers, lost tiers greyed', async () => {
@@ -293,9 +293,13 @@ describe('HallOfFame', () => {
 describe('Settings', () => {
   const onBack = vi.fn()
 
-  it('has sound and reduce-motion controls but no theme switch', async () => {
-    await mount(<Settings onBack={onBack} />)
-    expect(screen.queryByText(/theme/i)).toBeNull()
+  it('has theme, sound and reduce-motion controls', async () => {
+    await mount(<Settings onNavigate={onBack} />)
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Theme' })).getByRole('radio', { name: 'Dark' }))
+    })
+    await waitFor(() => expect(S().settings.theme).toBe('dark'))
+    expect((await repo.getSettings()).theme).toBe('dark')
     const sound = screen.getByRole('switch', { name: 'Sound' })
     expect(sound).toHaveAttribute('aria-checked', 'false')
     await act(async () => {
@@ -307,12 +311,12 @@ describe('Settings', () => {
       fireEvent.click(screen.getByRole('radio', { name: 'On' }))
     })
     await waitFor(() => expect(S().settings.reduceMotion).toBe('on'))
-    expect(S().settings.theme).toBe('system')
+    expect(S().settings.theme).toBe('dark')
   })
 
   it('notifications on web: "Available in the app", no permission check or hint', async () => {
     sched.notificationPermission.mockResolvedValue('denied')
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     expect(screen.getByText('Available in the app')).toBeInTheDocument()
     expect(screen.queryByText(/Open settings/i)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Enable' })).toBeNull()
@@ -322,7 +326,7 @@ describe('Settings', () => {
   it('notifications: Enable requests permission when not yet asked (native)', async () => {
     platform.native = true
     sched.notificationPermission.mockResolvedValue('prompt')
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     const btn = await screen.findByRole('button', { name: 'Enable' })
     sched.notificationPermission.mockResolvedValue('granted')
     await act(async () => {
@@ -335,7 +339,7 @@ describe('Settings', () => {
   it('notifications: denied shows the open-settings hint (native)', async () => {
     platform.native = true
     sched.notificationPermission.mockResolvedValue('denied')
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     expect(await screen.findByText(/Open settings/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Enable' })).toBeNull()
   })
@@ -352,7 +356,7 @@ describe('Settings', () => {
       downloaded = this.download
     })
     await repo.putHabit(habit('a'))
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     now = at(41) // the clock moves on after the screen opened; the name uses click time
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Export backup' }))
@@ -368,7 +372,7 @@ describe('Settings', () => {
 
   it('export on native writes to the cache dir and shares the file', async () => {
     platform.native = true
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Export backup' }))
     })
@@ -390,7 +394,7 @@ describe('Settings', () => {
   }
 
   it('import of an invalid file shows its error and does not import', async () => {
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     await pick('{not json')
     expect(await screen.findByRole('alert')).toHaveTextContent('File is not valid JSON')
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -398,7 +402,7 @@ describe('Settings', () => {
   })
 
   it('a file that cannot be read shows an alert', async () => {
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     const f = new File(['{}'], 'b.json', { type: 'application/json' })
     f.text = () => Promise.reject(new Error('permission revoked'))
     await act(async () => {
@@ -413,7 +417,7 @@ describe('Settings', () => {
       app: 'skillup', version: 1, exportedAt: now, habits: [habit('x')], sessions: [], seen: [],
       settings: { theme: 'system', sound: false, reduceMotion: 'system' },
     }
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     await pick(JSON.stringify(backup))
     act(() => useApp.setState({ load: vi.fn(async () => Promise.reject(new Error('boom'))) }))
     await act(async () => {
@@ -433,7 +437,7 @@ describe('Settings', () => {
       app: 'skillup', version: 1, exportedAt: now, habits, sessions, seen: [],
       settings: { theme: 'system', sound: true, reduceMotion: 'off' },
     }
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     await pick(JSON.stringify(backup))
     const sheet = await screen.findByRole('dialog')
     expect(sheet).toHaveTextContent('2 habits, 143 sessions will replace current data')
@@ -448,14 +452,14 @@ describe('Settings', () => {
   })
 
   it('exact reminders: no row on web', async () => {
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     expect(screen.queryByText('Exact reminders')).toBeNull()
     expect(sched.exactAlarmStatus).not.toHaveBeenCalled()
   })
 
   it('exact reminders: "On" when granted (native)', async () => {
     platform.native = true
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     const row = (await screen.findByText('Exact reminders')).parentElement!
     expect(within(row).getByText('On')).toBeInTheDocument()
     expect(within(row).queryByRole('button')).toBeNull()
@@ -464,7 +468,7 @@ describe('Settings', () => {
   it('exact reminders: Enable opens the system setting and re-checks (native)', async () => {
     platform.native = true
     sched.exactAlarmStatus.mockResolvedValue('denied')
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     const btn = await screen.findByRole('button', { name: 'Enable exact reminders' })
     sched.exactAlarmStatus.mockResolvedValue('granted')
     await act(async () => {
@@ -479,7 +483,7 @@ describe('Settings', () => {
     platform.native = true
     sched.exactAlarmStatus.mockResolvedValue('denied')
     sched.openExactAlarmSetting.mockRejectedValueOnce(new Error('no activity'))
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     const btn = await screen.findByRole('button', { name: 'Enable exact reminders' })
     const before = sched.exactAlarmStatus.mock.calls.length
     await act(async () => {
@@ -492,7 +496,7 @@ describe('Settings', () => {
     platform.native = true
     sched.exactAlarmStatus.mockResolvedValue('denied')
     vi.mocked(App.addListener).mockClear()
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     await screen.findByRole('button', { name: 'Enable exact reminders' })
     const calls = vi.mocked(App.addListener).mock.calls as unknown as [string, (s: { isActive: boolean }) => void][]
     const resume = calls.filter(([ev]) => ev === 'appStateChange').map(([, fn]) => fn)
@@ -504,7 +508,7 @@ describe('Settings', () => {
   })
 
   it('back button returns', async () => {
-    await mount(<Settings onBack={onBack} />)
+    await mount(<Settings onNavigate={onBack} />)
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(onBack).toHaveBeenCalled()
   })

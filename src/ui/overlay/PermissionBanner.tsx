@@ -30,19 +30,19 @@ export function PermissionBanner() {
         <motion.section
           key="prompt"
           aria-label="Reminders not enabled"
-          className="mb-4 flex items-center gap-3 rounded-3xl border border-[#9775fa]/30 bg-[#9775fa]/10 p-3"
+          className="mb-4 flex items-center gap-3 rounded-[22px] border-[1.5px] border-line bg-surface p-3"
           initial={hidden}
           animate={{ opacity: 1, y: 0 }}
           exit={hidden}
         >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#9775fa]/20 text-[#b197fc]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-on-tint border-[1.5px] border-line">
             <Glyph name="bell" />
           </span>
           <p className="min-w-0 flex-1 text-sm font-semibold">Turn on reminders so you never miss a day</p>
           <button
             type="button"
             onClick={() => void enableNotifications(recheck, reschedule)}
-            className="min-h-[44px] shrink-0 rounded-2xl bg-gradient-to-br from-[#9775fa] to-[#4dabf7] px-3 text-sm font-semibold"
+            className="min-h-[44px] shrink-0 rounded-full border-[1.5px] border-line bg-accent px-4 font-display font-bold text-on-tint text-sm font-semibold"
           >
             Enable
           </button>
@@ -52,20 +52,20 @@ export function PermissionBanner() {
         <motion.section
           key="notifications"
           aria-label="Notifications off"
-          className="mb-4 flex items-start gap-3 rounded-3xl border border-[#ffa94d]/30 bg-[#ffa94d]/10 p-3"
+          className="mb-4 flex items-start gap-3 rounded-[22px] border-[1.5px] border-line bg-[#f7c29b]/25 p-3"
           initial={hidden}
           animate={{ opacity: 1, y: 0 }}
           exit={hidden}
         >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ffa94d]/20 text-[#ffa94d]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-[1.5px] border-line bg-[#f7c29b] text-on-tint">
             <Glyph name="bellOff" />
           </span>
           <div className="min-w-0 flex-1 self-center">
             <p className="font-display font-semibold">Reminders are off</p>
             {help ? (
-              <p className="text-xs text-white/60">{OPEN_SETTINGS_HINT}</p>
+              <p className="text-xs text-muted">{OPEN_SETTINGS_HINT}</p>
             ) : (
-              <button type="button" onClick={() => setHelp(true)} className="min-h-[32px] text-xs font-semibold text-[#ffa94d] underline">
+              <button type="button" onClick={() => setHelp(true)} className="min-h-[32px] text-xs font-semibold text-ink underline">
                 How to turn on
               </button>
             )}
@@ -76,19 +76,19 @@ export function PermissionBanner() {
         <motion.section
           key="exact"
           aria-label="Exact alarms off"
-          className="mb-4 flex items-center gap-3 rounded-3xl border border-[#ffa94d]/30 bg-[#ffa94d]/10 p-3"
+          className="mb-4 flex items-center gap-3 rounded-[22px] border-[1.5px] border-line bg-[#f7c29b]/25 p-3"
           initial={hidden}
           animate={{ opacity: 1, y: 0 }}
           exit={hidden}
         >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ffa94d]/20 text-[#ffa94d]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-[1.5px] border-line bg-[#f7c29b] text-on-tint">
             <Glyph name="alarm" />
           </span>
           <p className="min-w-0 flex-1 text-sm font-semibold">{EXACT_ALARM_TEXT}</p>
           <button
             type="button"
             onClick={() => void enableExactAlarms(recheckExact)}
-            className="min-h-[44px] shrink-0 rounded-2xl bg-[#ffa94d]/20 px-3 text-sm font-semibold text-[#ffa94d]"
+            className="min-h-[44px] shrink-0 rounded-full border-[1.5px] border-line bg-[#f7c29b] px-4 text-sm font-bold text-on-tint"
           >
             Allow
           </button>

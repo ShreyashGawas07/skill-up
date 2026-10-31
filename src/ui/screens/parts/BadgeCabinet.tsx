@@ -3,13 +3,13 @@ import { Emblem } from '@/ui/art/Emblem'
 
 /** The 30-day "Formed" seal: a laurel ring with a check, greyed until formed. */
 function FormedSeal({ lit, size = 56 }: { lit: boolean; size?: number }) {
-  const c = lit ? '#69db7c' : '#5b606b'
+  const c = lit ? '#2f8a4f' : '#8a8178'
   return (
     <svg viewBox="0 0 56 56" width={size} height={size} role="img" aria-label={lit ? 'Formed' : 'Formed, locked'}>
       <defs>
         <radialGradient id={`seal-${lit ? 'on' : 'off'}`} cx="0.4" cy="0.35" r="0.7">
-          <stop offset="0" stopColor={lit ? '#d3f9d8' : '#8a8f99'} />
-          <stop offset="1" stopColor={lit ? '#2b8a3e' : '#2c2f36'} />
+          <stop offset="0" stopColor={lit ? '#d3f9d8' : '#d8d0c3'} />
+          <stop offset="1" stopColor={lit ? '#5fbf7f' : '#9a9184'} />
         </radialGradient>
       </defs>
       <circle cx="28" cy="28" r="22" fill={`url(#seal-${lit ? 'on' : 'off'})`} opacity={lit ? 1 : 0.6} />
@@ -27,11 +27,11 @@ function FormedSeal({ lit, size = 56 }: { lit: boolean; size?: number }) {
 export function BadgeCabinet({ state, reducedMotion }: { state: HabitState; reducedMotion?: boolean }) {
   const tiers = [...state.badges.tiersReached].sort((a, b) => a - b)
   return (
-    <ul aria-label="Badges" className="grid grid-cols-4 gap-3 rounded-3xl border border-white/5 bg-white/[0.03] p-4">
+    <ul aria-label="Badges" className="grid grid-cols-4 gap-3">
       <li className="flex flex-col items-center gap-1">
         <FormedSeal lit={state.badges.formed} />
         {!state.badges.formed && (
-          <span className="font-display text-xs font-semibold text-white/50">{state.formingDone}/30</span>
+          <span className="font-display text-xs font-semibold text-muted">{state.formingDone}/30</span>
         )}
       </li>
       {tiers.map((t) => {

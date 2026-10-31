@@ -12,12 +12,16 @@ interface Props {
   color: string
   size?: number
   reducedMotion?: boolean
+  /** Track colour (default white for dark tiles; ink for pastel tiles). */
+  track?: string
+  /** Flat style: no glows, solid arc. For the pastel timer tile. */
+  flat?: boolean
   children?: ReactNode
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0))
 
-export function Ring({ progress, overtime, color, size = 200, reducedMotion, children }: Props) {
+export function Ring({ progress, overtime, color, size = 200, reducedMotion, track = '#ffffff', flat, children }: Props) {
   const reduce = useReduce(reducedMotion)
   const uid = useId().replace(/[^A-Za-z0-9]/g, '')
   const p = clamp01(progress)
@@ -62,23 +66,23 @@ export function Ring({ progress, overtime, color, size = 200, reducedMotion, chi
         </defs>
 
         {/* inner glow disc */}
-        <circle cx={c} cy={c} r={r + stroke} fill={`url(#${uid}-core)`} />
+        {!flat && <circle cx={c} cy={c} r={r + stroke} fill={`url(#${uid}-core)`} />}
         {/* track with tick marks */}
-        <circle cx={c} cy={c} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.07} strokeWidth={stroke} />
+        <circle cx={c} cy={c} r={r} fill="none" stroke={track} strokeOpacity={flat ? 0.14 : 0.07} strokeWidth={stroke} />
         <circle
           cx={c}
           cy={c}
           r={r}
           fill="none"
-          stroke="#ffffff"
-          strokeOpacity={0.12}
+          stroke={track}
+          strokeOpacity={flat ? 0.22 : 0.12}
           strokeWidth={stroke * 0.35}
           strokeDasharray={`1 ${((2 * Math.PI * r) / 24 - 1).toFixed(2)}`}
         />
 
         {/* progress glow + arc */}
         <g transform={`rotate(-90 ${c} ${c})`}>
-          {p > 0 && (
+          {p > 0 && !flat && (
             <motion.circle
               cx={c}
               cy={c}
@@ -99,7 +103,7 @@ export function Ring({ progress, overtime, color, size = 200, reducedMotion, chi
               cy={c}
               r={r}
               fill="none"
-              stroke={`url(#${uid}-main)`}
+              stroke={flat ? color : `url(#${uid}-main)`}
               strokeWidth={stroke}
               strokeLinecap="round"
               {...arc(p)}
@@ -129,7 +133,7 @@ export function Ring({ progress, overtime, color, size = 200, reducedMotion, chi
           <g data-testid="overdrive">
             <circle cx={c} cy={c} r={rO} fill="none" stroke={OVERDRIVE.mid} strokeOpacity={0.12} strokeWidth={od} />
             <g transform={`rotate(-90 ${c} ${c})`}>
-              <motion.circle
+              {!flat && <motion.circle
                 cx={c}
                 cy={c}
                 r={rO}
@@ -140,14 +144,14 @@ export function Ring({ progress, overtime, color, size = 200, reducedMotion, chi
                 strokeLinecap="round"
                 style={{ filter: `blur(${size * 0.02}px)` }}
                 {...arc(o)}
-              />
+              />}
               <motion.circle
                 cx={c}
                 cy={c}
                 r={rO}
                 fill="none"
-                stroke={`url(#${uid}-gold)`}
-                strokeWidth={od}
+                stroke={flat ? OVERDRIVE.to : `url(#${uid}-gold)`}
+                strokeWidth={flat ? od * 1.3 : od}
                 strokeLinecap="round"
                 {...arc(o)}
               />

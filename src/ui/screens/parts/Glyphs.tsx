@@ -2,8 +2,19 @@
 type Name =
   | 'plus' | 'lock' | 'gear' | 'pencil' | 'trophy' | 'back' | 'next' | 'check' | 'minus'
   | 'trash' | 'bell' | 'bellOff' | 'upload' | 'download' | 'close' | 'sound' | 'mute' | 'motion' | 'alarm'
+  | 'home' | 'clock' | 'chart' | 'sun' | 'moon' | 'auto' | 'target' | 'bolt' | 'play' | 'stop'
 
 const PATHS: Record<Name, string> = {
+  home: 'M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  chart: 'M4 20h16M7 16v-4M12 16V8M17 16v-7',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon: 'M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z',
+  auto: 'M12 21a9 9 0 1 0 0-18v18zM12 3a9 9 0 0 1 0 18',
+  target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
+  bolt: 'M13 3L5 14h6l-1 7 8-11h-6l1-7z',
+  play: 'M8 5.5v13l10-6.5z',
+  stop: 'M7 7h10v10H7z',
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
   lock: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z',

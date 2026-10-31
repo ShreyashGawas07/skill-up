@@ -35,19 +35,34 @@ export const TIER_STYLE: Record<number, TierStyle> = {
   10: { primary: '#ffe27a', secondary: '#e8780c', glow: '#fff6d0', material: 'cosmic' },
 }
 
-/** 8 habit accent colours (cards, rings, heatmap). */
+/** 8 pastel habit colours (headers, bars, heatmap). Text on them is always `--on-tint` ink. */
 export const HABIT_COLORS: string[] = [
-  '#ff6b6b', // coral
-  '#ffa94d', // tangerine
-  '#ffd43b', // sun
-  '#69db7c', // mint
-  '#38d9a9', // teal
-  '#4dabf7', // sky
-  '#9775fa', // violet
-  '#f783ac', // pink
+  '#a9d9b8', // sage
+  '#f4a99c', // coral
+  '#c9b6ec', // lavender
+  '#f8d77c', // butter
+  '#a8cdf0', // sky
+  '#f7c29b', // peach
+  '#9edfd2', // mint
+  '#f3b6d0', // rose
 ]
 
-/** Overdrive (overtime) ring gold. */
-export const OVERDRIVE = { from: '#fff3b0', mid: '#ffcf3f', to: '#ff9f1c' }
+/** v1 saturated colours, remapped on load so existing habits pick up the pastel palette. */
+const LEGACY: Record<string, string> = {
+  '#ff6b6b': '#f4a99c',
+  '#ffa94d': '#f7c29b',
+  '#ffd43b': '#f8d77c',
+  '#69db7c': '#a9d9b8',
+  '#38d9a9': '#9edfd2',
+  '#4dabf7': '#a8cdf0',
+  '#9775fa': '#c9b6ec',
+  '#f783ac': '#f3b6d0',
+}
 
-export const BG = '#0b0b12'
+export const pastel = (color: string): string => LEGACY[color.toLowerCase()] ?? color
+
+/** Overdrive (overtime) gold. */
+export const OVERDRIVE = { from: '#fff3b0', mid: '#f5b324', to: '#e08a12' }
+
+/** Fixed dark ink used on pastel tints in both themes. */
+export const ON_TINT = '#28221e'

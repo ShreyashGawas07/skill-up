@@ -3,6 +3,8 @@ import { useApp } from '@/store/useApp'
 import type { Route } from '@/ui/route'
 import { Home } from '@/ui/screens/Home'
 import { AddHabit } from '@/ui/screens/AddHabit'
+import { CelebrationOverlay } from '@/ui/overlay/CelebrationOverlay'
+import { StaleSessionDialog } from '@/ui/overlay/StaleSessionDialog'
 
 /** Temporary screen until Tasks 10–11 fill detail / settings / hall. */
 function Placeholder({ title, onBack }: { title: string; onBack(): void }) {
@@ -38,6 +40,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0b0b12] text-white">
+      <CelebrationOverlay />
+      <StaleSessionDialog />
       {kind === 'home' && <Home onNavigate={setRoute} />}
       {kind === 'add' && <AddHabit onDone={home} />}
       {kind === 'edit' && <AddHabit key={id} habitId={id} onDone={home} />}

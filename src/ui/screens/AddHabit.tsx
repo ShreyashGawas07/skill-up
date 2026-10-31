@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useApp, type HabitInput } from '@/store/useApp'
 import { haptic } from '@/feedback/haptics'
+import { notificationPermission, requestNotificationPermission } from '@/notify/scheduler'
 import { useReduce } from '@/ui/art/useReduce'
 import { HABIT_COLORS } from '@/ui/theme'
 import { DIAL_MAX, DIAL_MIN, DIAL_STEP, HoursDial } from './parts/HoursDial'
@@ -42,11 +43,26 @@ interface Props {
   onDone(): void
 }
 
+/**
+ * Asks for notification permission if it was never asked ('prompt'), then re-plans notifications
+ * so the new habit's reminders are scheduled. Failures are ignored (reminders are best-effort).
+ */
+async function askForNotifications(reschedule: () => Promise<void>): Promise<void> {
+  try {
+    if ((await notificationPermission()) !== 'prompt') return
+    await requestNotificationPermission()
+    await reschedule()
+  } catch {
+    // Permission APIs unavailable; Settings and the Home banner still offer it.
+  }
+}
+
 export function AddHabit({ habitId, onDone }: Props) {
   const habits = useApp((s) => s.habits)
   const states = useApp((s) => s.states)
   const addHabit = useApp((s) => s.addHabit)
   const updateHabit = useApp((s) => s.updateHabit)
+  const reschedule = useApp((s) => s.reschedule)
   const rm = motionPref(useApp((s) => s.settings.reduceMotion))
   const reduce = useReduce(rm)
 
@@ -98,6 +114,8 @@ export function AddHabit({ habitId, onDone }: Props) {
         await updateHabit(editing.id, formed ? { ...rest, dailyMinutes } : rest)
       } else {
         await addHabit(input)
+        // Android 13+: nothing is ever shown until the user is asked, so ask once a habit exists.
+        void askForNotifications(reschedule)
       }
       haptic.success()
       onDone()
@@ -142,7 +160,13 @@ export function AddHabit({ habitId, onDone }: Props) {
             <motion.span
               key={i}
               className="h-2 rounded-full"
-              animate={{ width: i === step ? 28 : 8, backgroundColor: i <= step ? v.color : 'rgba(255,255,255,.15)' }}
+              // Reduce-motion: the width snaps (static style); only the colour fades.
+              style={reduce ? { width: i === step ? 28 : 8 } : undefined}
+              animate={
+                reduce
+                  ? { backgroundColor: i <= step ? v.color : 'rgba(255,255,255,.15)' }
+                  : { width: i === step ? 28 : 8, backgroundColor: i <= step ? v.color : 'rgba(255,255,255,.15)' }
+              }
             />
           ))}
         </div>

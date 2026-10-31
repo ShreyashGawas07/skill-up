@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const native = vi.hoisted(() => ({ value: true }))
 const LN = vi.hoisted(() => ({
   getPending: vi.fn(),
+  getDeliveredNotifications: vi.fn(),
   cancel: vi.fn(async () => {}),
   schedule: vi.fn(async () => ({ notifications: [] })),
   registerActionTypes: vi.fn(async () => {}),
@@ -16,25 +17,35 @@ vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => native.
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: LN }))
 
 import {
-  applySchedule, exactAlarmStatus, notificationPermission, openExactAlarmSetting, registerNotificationActions,
+  __resetSchedulerForTests, applySchedule, exactAlarmStatus, notificationPermission, openExactAlarmSetting, registerNotificationActions,
   requestNotificationPermission,
 } from '@/notify/scheduler'
+import { notifId } from '@/notify/plan'
 import type { NotifSpec } from '@/notify/plan'
 
 beforeEach(() => {
   native.value = true
   Object.values(LN).forEach((f) => f.mockClear())
   LN.getPending.mockResolvedValue({ notifications: [{ id: 7 }, { id: 1003 }] })
+  LN.getDeliveredNotifications.mockResolvedValue({ notifications: [] })
+  __resetSchedulerForTests()
 })
+
+const RUN0 = notifId(0, 'running', 0)
+const RUN1 = notifId(1, 'running', 0)
+const cancelled = (call = 0) =>
+  ((LN.cancel.mock.calls[call] as unknown as [{ notifications: { id: number }[] }])[0].notifications.map((n) => n.id))
+const scheduledIds = (call = 0) =>
+  ((LN.schedule.mock.calls[call] as unknown as [{ notifications: { id: number }[] }])[0].notifications.map((n) => n.id))
 
 const spec = (over: Partial<NotifSpec> = {}): NotifSpec => ({
   id: 1, habitId: 'h', kind: 'reminder', at: 5000, title: 'T', body: 'B', largeIconTier: 3, ...over,
 })
 
 describe('scheduler', () => {
-  it('cancels all pending before scheduling', async () => {
+  it('cancels all pending (and both running ids) before scheduling', async () => {
     await applySchedule([spec()])
-    expect(LN.cancel).toHaveBeenCalledWith({ notifications: [{ id: 7 }, { id: 1003 }] })
+    expect(cancelled().sort((a, b) => a - b)).toEqual([7, RUN0, 1003, RUN1].sort((a, b) => a - b))
     expect(LN.cancel.mock.invocationCallOrder[0]).toBeLessThan(LN.schedule.mock.invocationCallOrder[0])
   })
 
@@ -56,6 +67,53 @@ describe('scheduler', () => {
     await applySchedule([])
     expect(LN.cancel).toHaveBeenCalled()
     expect(LN.schedule).not.toHaveBeenCalled()
+  })
+
+  it('cancels a delivered running notification that is not pending (Stop / switch timers)', async () => {
+    // The ongoing "running" notification is delivered immediately, so it never shows in getPending().
+    LN.getPending.mockResolvedValue({ notifications: [] })
+    LN.getDeliveredNotifications.mockResolvedValue({ notifications: [{ id: RUN0 }] })
+    const run = spec({ id: RUN0, kind: 'running', at: null, ongoing: true, actionTypeId: 'SESSION' })
+    await applySchedule([run])
+    // Timer stopped: the plan has no running spec any more.
+    await applySchedule([spec()])
+    expect(cancelled(1)).toEqual(expect.arrayContaining([RUN0, RUN1]))
+    // Switched to the other habit: slot 0's running id is cancelled, slot 1's is posted.
+    LN.cancel.mockClear()
+    LN.schedule.mockClear()
+    await applySchedule([spec({ id: RUN1, kind: 'running', at: null, ongoing: true })])
+    expect(cancelled()).toContain(RUN0)
+    expect(scheduledIds()).toEqual([RUN1])
+  })
+
+  it('does not re-post an unchanged running notification that is still delivered', async () => {
+    LN.getPending.mockResolvedValue({ notifications: [] })
+    const run = spec({ id: RUN0, kind: 'running', at: null, ongoing: true, body: 'Running' })
+    await applySchedule([run, spec()])
+    expect(scheduledIds(0)).toEqual([RUN0, 1])
+    LN.getDeliveredNotifications.mockResolvedValue({ notifications: [{ id: RUN0 }] })
+    await applySchedule([run, spec()])
+    expect(cancelled(1)).not.toContain(RUN0)
+    expect(cancelled(1)).toContain(RUN1)
+    expect(scheduledIds(1)).toEqual([1])
+    // Body changed: cancelled and re-posted.
+    await applySchedule([{ ...run, body: 'Other' }])
+    expect(cancelled(2)).toContain(RUN0)
+    expect(scheduledIds(2)).toEqual([RUN0])
+    // Swiped away / not delivered any more: re-posted even if unchanged.
+    LN.getDeliveredNotifications.mockResolvedValue({ notifications: [] })
+    await applySchedule([{ ...run, body: 'Other' }])
+    expect(scheduledIds(3)).toEqual([RUN0])
+  })
+
+  it('still cancels the running ids if getDeliveredNotifications is unavailable', async () => {
+    LN.getPending.mockResolvedValue({ notifications: [] })
+    LN.getDeliveredNotifications.mockRejectedValue(new Error('not implemented'))
+    const run = spec({ id: RUN0, kind: 'running', at: null, ongoing: true })
+    await applySchedule([run])
+    await applySchedule([run])
+    expect(cancelled(1)).toEqual(expect.arrayContaining([RUN0, RUN1]))
+    expect(scheduledIds(1)).toEqual([RUN0])
   })
 
   it('is a no-op on web', async () => {

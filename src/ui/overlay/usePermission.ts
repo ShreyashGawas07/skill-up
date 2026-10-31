@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { exactAlarmStatus, notificationPermission, type ExactAlarm } from '@/notify/scheduler'
+import {
+  exactAlarmStatus, notificationPermission, openExactAlarmSetting, requestNotificationPermission, type ExactAlarm,
+} from '@/notify/scheduler'
 
 /** 'unsupported' = not running natively (web preview): no local notifications at all. */
 export type Permission = 'granted' | 'denied' | 'prompt' | 'unsupported'
@@ -53,4 +55,31 @@ export function usePermission(): [Permission | undefined, () => Promise<void>] {
 /** Android exact-alarm ("Alarms & reminders") access; re-checked on resume (the user returns from system settings). */
 export function useExactAlarm(): [ExactAlarm | undefined, () => Promise<void>] {
   return useNativeStatus(exactAlarmStatus)
+}
+
+/**
+ * Asks for notification permission, then re-checks it and re-plans notifications (a grant means
+ * reminders can now be scheduled). Re-checks even if the request fails.
+ */
+export async function enableNotifications(recheck: () => Promise<void>, reschedule: () => Promise<void>): Promise<void> {
+  try {
+    await requestNotificationPermission()
+  } catch {
+    // Fall through: the re-check shows whatever the system now reports.
+  }
+  await recheck()
+  await reschedule()
+}
+
+/**
+ * Opens the system "Alarms & reminders" screen, then re-checks (also re-checked on resume).
+ * Re-checks even if the screen could not be opened.
+ */
+export async function enableExactAlarms(recheck: () => Promise<void>): Promise<void> {
+  try {
+    await openExactAlarmSetting()
+  } catch {
+    // Fall through to the re-check.
+  }
+  await recheck()
 }

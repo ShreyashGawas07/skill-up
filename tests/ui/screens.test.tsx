@@ -475,6 +475,19 @@ describe('Settings', () => {
     expect(within(screen.getByText('Exact reminders').parentElement!).getByText('On')).toBeInTheDocument()
   })
 
+  it('exact reminders: re-checks even if opening the system setting fails (native)', async () => {
+    platform.native = true
+    sched.exactAlarmStatus.mockResolvedValue('denied')
+    sched.openExactAlarmSetting.mockRejectedValueOnce(new Error('no activity'))
+    await mount(<Settings onBack={onBack} />)
+    const btn = await screen.findByRole('button', { name: 'Enable exact reminders' })
+    const before = sched.exactAlarmStatus.mock.calls.length
+    await act(async () => {
+      fireEvent.click(btn)
+    })
+    await waitFor(() => expect(sched.exactAlarmStatus.mock.calls.length).toBeGreaterThan(before))
+  })
+
   it('exact reminders: re-checks when the app resumes (native)', async () => {
     platform.native = true
     sched.exactAlarmStatus.mockResolvedValue('denied')
@@ -533,6 +546,34 @@ describe('PermissionBanner on Home', () => {
     await mount(<Home onNavigate={nav} />)
     await screen.findByRole('region', { name: 'Notifications off' })
     expect(screen.queryByRole('region', { name: 'Exact alarms off' })).toBeNull()
+  })
+
+  it('when never asked (prompt) on native, offers Enable, which requests, re-checks and reschedules', async () => {
+    platform.native = true
+    sched.notificationPermission.mockResolvedValue('prompt')
+    await mount(<Home onNavigate={nav} />)
+    const banner = await screen.findByRole('region', { name: 'Reminders not enabled' })
+    sched.notificationPermission.mockResolvedValue('granted')
+    sched.applySchedule.mockClear()
+    await act(async () => {
+      fireEvent.click(within(banner).getByRole('button', { name: 'Enable' }))
+    })
+    expect(sched.requestNotificationPermission).toHaveBeenCalledOnce()
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Reminders not enabled' })).toBeNull())
+    expect(sched.applySchedule).toHaveBeenCalled()
+  })
+
+  it('exact-alarm Allow re-checks even if opening the system setting fails (native)', async () => {
+    platform.native = true
+    sched.exactAlarmStatus.mockResolvedValue('denied')
+    sched.openExactAlarmSetting.mockRejectedValueOnce(new Error('no activity'))
+    await mount(<Home onNavigate={nav} />)
+    const banner = await screen.findByRole('region', { name: 'Exact alarms off' })
+    const before = sched.exactAlarmStatus.mock.calls.length
+    await act(async () => {
+      fireEvent.click(within(banner).getByRole('button', { name: 'Allow' }))
+    })
+    await waitFor(() => expect(sched.exactAlarmStatus.mock.calls.length).toBeGreaterThan(before))
   })
 
   it('is hidden when permission is granted on native', async () => {

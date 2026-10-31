@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import type { Settings as AppSettings } from '@/data/repo'
-import { openExactAlarmSetting, requestNotificationPermission } from '@/notify/scheduler'
 import { useApp } from '@/store/useApp'
 import { OPEN_SETTINGS_HINT } from '@/ui/overlay/PermissionBanner'
-import { useExactAlarm, usePermission } from '@/ui/overlay/usePermission'
+import { enableExactAlarms, enableNotifications, useExactAlarm, usePermission } from '@/ui/overlay/usePermission'
 import { BackupSection } from './parts/BackupSection'
 import { motionPref } from './parts/format'
 import { Glyph } from './parts/Glyphs'
@@ -35,19 +34,10 @@ export function Settings({ onBack }: { onBack(): void }) {
   const [exact, recheckExact] = useExactAlarm()
   const save = (patch: Partial<AppSettings>) => void saveSettings({ ...settings, ...patch })
 
-  const enable = async () => {
-    await requestNotificationPermission()
-    await recheck()
-  }
-
-  const enableExact = async () => {
-    try {
-      await openExactAlarmSetting()
-    } finally {
-      // Also re-checked when the app resumes from the system screen.
-      await recheckExact()
-    }
-  }
+  const reschedule = useApp((s) => s.reschedule)
+  // A grant re-plans notifications; exact alarms are also re-checked when the app resumes.
+  const enable = () => enableNotifications(recheck, reschedule)
+  const enableExact = () => enableExactAlarms(recheckExact)
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-3 px-4 pb-10 pt-4">
@@ -127,7 +117,7 @@ export function Settings({ onBack }: { onBack(): void }) {
             <button
               type="button"
               aria-label="Enable exact reminders"
-              onClick={() => void enableExact().catch(() => {})}
+              onClick={() => void enableExact()}
               className="min-h-[44px] rounded-2xl bg-gradient-to-br from-[#9775fa] to-[#4dabf7] px-4 text-sm font-semibold"
             >
               Enable

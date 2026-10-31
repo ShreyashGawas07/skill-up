@@ -4,6 +4,8 @@ import { addDays, setHours } from 'date-fns'
 const sched = vi.hoisted(() => ({
   applySchedule: vi.fn(async (_specs: unknown[]) => {}),
   registerNotificationActions: vi.fn(async () => {}),
+  notificationPermission: vi.fn(async (): Promise<'granted' | 'denied' | 'prompt'> => 'granted'),
+  requestNotificationPermission: vi.fn(async () => true),
 }))
 vi.mock('@/notify/scheduler', () => sched)
 vi.mock('@capacitor/app', () => ({ App: { addListener: vi.fn(async () => ({ remove: async () => {} })) } }))
@@ -34,6 +36,8 @@ beforeEach(async () => {
   now = at(0)
   setClock(() => now)
   done.mockClear()
+  sched.notificationPermission.mockReset().mockResolvedValue('granted')
+  sched.requestNotificationPermission.mockClear()
   await S().load()
 })
 
@@ -65,6 +69,51 @@ describe('AddHabit', () => {
     const h = S().habits[0]
     expect(h).toMatchObject({ name: 'Guitar', icon: 'guitar', targetHours: 10000, reminderTime: '19:00' })
     expect(h.commitmentHistory).toEqual([{ fromDate: dayKey(now), dailyMinutes: 75 }])
+  })
+
+  it('reduce-motion: step dots change width instantly (no width animation)', async () => {
+    await act(() => S().saveSettings({ ...S().settings, reduceMotion: 'on' }))
+    render(<AddHabit onDone={done} />)
+    const dots = () => [...screen.getByRole('progressbar').children] as HTMLElement[]
+    expect(dots()[0].style.width).toBe('28px')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Run' } })
+    next()
+    expect(dots()[0].style.width).toBe('8px')
+    expect(dots()[1].style.width).toBe('28px')
+  })
+
+  const saveNew = async () => {
+    const view = render(<AddHabit onDone={done} />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Run' } })
+    next()
+    next()
+    next()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    })
+    await waitFor(() => expect(done).toHaveBeenCalled())
+    view.unmount()
+  }
+
+  it('after saving a new habit, asks for notification permission if not yet asked, then reschedules', async () => {
+    sched.notificationPermission.mockResolvedValue('prompt')
+    await saveNew()
+    await waitFor(() => expect(sched.requestNotificationPermission).toHaveBeenCalledOnce())
+    const requested = sched.requestNotificationPermission.mock.invocationCallOrder[0]
+    await waitFor(() =>
+      expect(sched.applySchedule.mock.invocationCallOrder.some((o) => o > requested)).toBe(true),
+    )
+    expect(S().habits).toHaveLength(1)
+  })
+
+  it('does not ask again when permission is already granted or denied', async () => {
+    await saveNew()
+    await waitFor(() => expect(sched.notificationPermission).toHaveBeenCalled())
+    sched.notificationPermission.mockResolvedValue('denied')
+    done.mockClear()
+    await saveNew()
+    await waitFor(() => expect(sched.notificationPermission).toHaveBeenCalledTimes(2))
+    expect(sched.requestNotificationPermission).not.toHaveBeenCalled()
   })
 
   it('dial clamps to 0:15 and 12:00', () => {

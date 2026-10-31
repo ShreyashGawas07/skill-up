@@ -1,5 +1,7 @@
 /** Small stroke icons for buttons. Decorative unless a label is given. */
-type Name = 'plus' | 'lock' | 'gear' | 'pencil' | 'trophy' | 'back' | 'next' | 'check' | 'minus'
+type Name =
+  | 'plus' | 'lock' | 'gear' | 'pencil' | 'trophy' | 'back' | 'next' | 'check' | 'minus'
+  | 'trash' | 'bell' | 'bellOff' | 'upload' | 'download' | 'close' | 'sound' | 'mute' | 'motion'
 
 const PATHS: Record<Name, string> = {
   plus: 'M12 5v14M5 12h14',
@@ -12,6 +14,15 @@ const PATHS: Record<Name, string> = {
   back: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',
   check: 'M5 12l5 5L19 7',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2zM10 21h4',
+  bellOff: 'M6 16V11a6 6 0 0 1 9.5-4.9M18 11v5l2 2H8M10 21h4M3 3l18 18',
+  upload: 'M12 16V4M7 9l5-5 5 5M4 20h16',
+  download: 'M12 4v12M7 11l5 5 5-5M4 20h16',
+  close: 'M6 6l12 12M18 6L6 18',
+  sound: 'M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12',
+  mute: 'M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6',
+  motion: 'M3 12h4M5 7h6M5 17h6M13 12a5 5 0 1 0 10 0 5 5 0 0 0-10 0',
 }
 
 export function Glyph({ name, size = 22, label }: { name: Name; size?: number; label?: string }) {

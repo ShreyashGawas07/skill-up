@@ -3,20 +3,11 @@ import { useApp } from '@/store/useApp'
 import type { Route } from '@/ui/route'
 import { Home } from '@/ui/screens/Home'
 import { AddHabit } from '@/ui/screens/AddHabit'
+import { HabitDetail } from '@/ui/screens/HabitDetail'
+import { HallOfFame } from '@/ui/screens/HallOfFame'
+import { Settings } from '@/ui/screens/Settings'
 import { CelebrationOverlay } from '@/ui/overlay/CelebrationOverlay'
 import { StaleSessionDialog } from '@/ui/overlay/StaleSessionDialog'
-
-/** Temporary screen until Tasks 10–11 fill detail / settings / hall. */
-function Placeholder({ title, onBack }: { title: string; onBack(): void }) {
-  return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-4">
-      <h2 className="font-display text-2xl font-bold">{title}</h2>
-      <button type="button" onClick={onBack} className="rounded-2xl bg-white/10 px-6 py-3 font-semibold">
-        Back
-      </button>
-    </div>
-  )
-}
 
 export default function App() {
   const [route, setRoute] = useState<Route>('home')
@@ -45,9 +36,9 @@ export default function App() {
       {kind === 'home' && <Home onNavigate={setRoute} />}
       {kind === 'add' && <AddHabit onDone={home} />}
       {kind === 'edit' && <AddHabit key={id} habitId={id} onDone={home} />}
-      {kind === 'detail' && <Placeholder title="Habit" onBack={home} />}
-      {kind === 'settings' && <Placeholder title="Settings" onBack={home} />}
-      {kind === 'hall' && <Placeholder title="Hall of Fame" onBack={home} />}
+      {kind === 'detail' && id && <HabitDetail key={id} habitId={id} onNavigate={setRoute} />}
+      {kind === 'settings' && <Settings onBack={home} />}
+      {kind === 'hall' && <HallOfFame onNavigate={setRoute} />}
     </div>
   )
 }

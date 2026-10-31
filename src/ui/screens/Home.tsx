@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '@/store/useApp'
 import { haptic } from '@/feedback/haptics'
 import { EmptyState } from '@/ui/art/EmptyState'
+import { PermissionBanner } from '@/ui/overlay/PermissionBanner'
 import type { Navigate } from '@/ui/route'
 import { HabitCard } from './HabitCard'
 import { Glyph } from './parts/Glyphs'
@@ -59,6 +60,8 @@ export function Home({ onNavigate }: { onNavigate: Navigate }) {
           </button>
         </div>
       </header>
+
+      <PermissionBanner />
 
       <main className="flex flex-1 flex-col gap-4">
         {active.map((h) => (

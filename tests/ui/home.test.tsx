@@ -4,6 +4,7 @@ import { addDays, setHours } from 'date-fns'
 const sched = vi.hoisted(() => ({
   applySchedule: vi.fn(async (_specs: unknown[]) => {}),
   registerNotificationActions: vi.fn(async () => {}),
+  notificationPermission: vi.fn(async () => 'granted' as const),
 }))
 vi.mock('@/notify/scheduler', () => sched)
 vi.mock('@capacitor/app', () => ({ App: { addListener: vi.fn(async () => ({ remove: async () => {} })) } }))

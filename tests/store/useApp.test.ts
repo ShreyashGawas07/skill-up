@@ -246,6 +246,68 @@ describe('useApp', () => {
     expect(S().running?.habitId).toBe('b')
   })
 
+  it('archived habits are frozen at archivedAt and never celebrate', async () => {
+    await repo.putHabit(habit('a'))
+    for (let n = 0; n < 30; n++) await repo.putSession(sess('a', n, 60))
+    now = at(30)
+    await S().load()
+    expect(S().states.a.formed).toBe(true)
+    await S().updateHabit('a', { archivedAt: now })
+    const frozen = S().states.a
+    expect(S().queue).toEqual([])
+
+    now = at(32)
+    S().tick(now)
+    expect(S().queue).toEqual([])
+    expect(S().states.a).toEqual(frozen)
+    await S().load()
+    expect(S().queue).toEqual([])
+    expect(S().states.a).toEqual(frozen)
+  })
+
+  it('unarchiving respects the 2-habit limit', async () => {
+    await repo.putHabit(habit('arch', { archivedAt: at(0) }))
+    await repo.putHabit(habit('b'))
+    await S().load()
+    await S().updateHabit('arch', { archivedAt: undefined })
+    expect(S().habits.find((h) => h.id === 'arch')).not.toHaveProperty('archivedAt')
+    await S().updateHabit('arch', { archivedAt: at(0) })
+    await S().addHabit(input)
+    await expect(S().updateHabit('arch', { archivedAt: undefined })).rejects.toThrow('2 habits max')
+    expect((await repo.listHabits()).find((h) => h.id === 'arch')?.archivedAt).toBe(at(0))
+  })
+
+  it('overlapping reschedules run in order and the last one plans from the latest state', async () => {
+    await repo.putHabit(habit('a'))
+    await S().load()
+    sched.applySchedule.mockClear()
+    let release!: () => void
+    sched.applySchedule.mockImplementationOnce(() => new Promise<void>((r) => (release = r)))
+    const p1 = S().start('a')
+    await vi.waitFor(() => expect(sched.applySchedule).toHaveBeenCalledTimes(1))
+    now += 60000
+    const p2 = S().stop()
+    await vi.waitFor(() => expect(S().running).toBeUndefined())
+    expect(sched.applySchedule).toHaveBeenCalledTimes(1) // second waits for the first
+    release()
+    await Promise.all([p1, p2])
+    expect(sched.applySchedule).toHaveBeenCalledTimes(2)
+    expect(scheduled(0).some((s) => s.kind === 'running')).toBe(true)
+    expect(scheduled(1).some((s) => s.kind === 'running')).toBe(false)
+  })
+
+  it('running excludes a stale open session', async () => {
+    await repo.putHabit(habit('a'))
+    const open: Session = { id: 'open', habitId: 'a', start: at(0, 2) }
+    await repo.putSession(open)
+    now = at(0, 3)
+    await S().load()
+    expect(S().running).toEqual(open)
+    S().tick(at(0, 2) + STALE_MS + 1)
+    expect(S().running).toBeUndefined()
+    expect(S().states.a.staleSession).toEqual(open)
+  })
+
   it('saveSettings persists', async () => {
     await S().load()
     await S().saveSettings({ theme: 'light', sound: true, reduceMotion: 'off' })

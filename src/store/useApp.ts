@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { App } from '@capacitor/app'
 import { repo, DEFAULT_SETTINGS } from '@/data/repo'
 import type { Settings } from '@/data/repo'
-import { evaluate } from '@/domain/evaluate'
+import { evaluate, isStale } from '@/domain/evaluate'
 import { dayKey, nextDay } from '@/domain/days'
 import type { Habit, HabitState, Session } from '@/domain/types'
 import { buildSchedule } from '@/notify/plan'
@@ -62,11 +62,17 @@ export const SEEDED_KEY = '__seeded__'
 let seen = new Set<string>()
 let nativeHooked = false
 
+/** Archived habits are frozen at their archive time so their stats stop changing. */
+const stateOf = (h: Habit, sessions: Session[], now: number) =>
+  evaluate(h, sessions, h.archivedAt === undefined ? now : Math.min(now, h.archivedAt))
+
 function derive(habits: Habit[], sessions: Session[], now: number) {
   const states: Record<string, HabitState> = {}
-  for (const h of habits) states[h.id] = evaluate(h, sessions, now)
-  const running = sessions.find((s) => s.end === undefined)
-  const queue = toCelebrations(Object.values(states).flatMap((s) => s.events), seen)
+  for (const h of habits) states[h.id] = stateOf(h, sessions, now)
+  // A stale open session is surfaced via states[x].staleSession, not as running.
+  const running = sessions.find((s) => s.end === undefined && !isStale(s, now))
+  const events = habits.filter((h) => h.archivedAt === undefined).flatMap((h) => states[h.id].events)
+  const queue = toCelebrations(events, seen)
   return { states, running, queue, now }
 }
 
@@ -74,13 +80,18 @@ const isActive = (h: Habit, states: Record<string, HabitState>) =>
   h.archivedAt === undefined && !states[h.id]?.eternal
 
 export const useApp = create<AppStore>()((set, get) => {
-  async function reschedule(): Promise<void> {
-    const { habits, states, running, now } = get()
-    try {
-      await applySchedule(buildSchedule({ habits, states, running, now }))
-    } catch (e) {
-      console.warn('Notification scheduling failed', e)
-    }
+  /** Reschedules run one at a time, each planning from the state current when it runs, so the last wins. */
+  let scheduling: Promise<void> = Promise.resolve()
+  function reschedule(): Promise<void> {
+    scheduling = scheduling.then(async () => {
+      const { habits, states, running, now } = get()
+      try {
+        await applySchedule(buildSchedule({ habits, states, running, now }))
+      } catch (e) {
+        console.warn('Notification scheduling failed', e)
+      }
+    })
+    return scheduling
   }
 
   /** Re-reads habits and sessions, recomputes everything, and reschedules notifications. */
@@ -135,7 +146,7 @@ export const useApp = create<AppStore>()((set, get) => {
         // Once per install: don't replay celebrations for days before today.
         const today = dayKey(now)
         const old = habits
-          .flatMap((h) => evaluate(h, sessions, now).events)
+          .flatMap((h) => stateOf(h, sessions, now).events)
           .filter((e) => e.day < today)
           .map(celebrationKey)
         const keys = [...old, SEEDED_KEY]
@@ -176,6 +187,12 @@ export const useApp = create<AppStore>()((set, get) => {
       if (!habit) throw new Error(`Unknown habit ${id}`)
       const { dailyMinutes, ...fields } = patch
       const next: Habit = { ...habit, ...fields }
+      if ('archivedAt' in fields && fields.archivedAt === undefined) {
+        delete next.archivedAt
+        const { habits, states } = get()
+        const others = habits.filter((h) => h.id !== id && isActive(h, states)).length
+        if (habit.archivedAt !== undefined && !states[id]?.eternal && others >= 2) throw new Error('2 habits max')
+      }
       const history = habit.commitmentHistory
       const current = history[history.length - 1]?.dailyMinutes
       if (dailyMinutes !== undefined && dailyMinutes !== current) {

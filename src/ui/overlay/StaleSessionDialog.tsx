@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import { format } from 'date-fns'
 import { STALE_MS } from '@/domain/evaluate'
@@ -24,6 +24,16 @@ export function StaleSessionDialog() {
   const reduce = useReduce(motionPref(useApp((s) => s.settings.reduceMotion)))
   const [mins, setMins] = useState<number>()
   const [busy, setBusy] = useState(false)
+  const keepRef = useRef<HTMLButtonElement>(null)
+
+  // On open: focus "Keep 16h"; on close: hand focus back to whatever had it before.
+  const staleId = stale?.id
+  useEffect(() => {
+    if (!staleId) return
+    const prev = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    keepRef.current?.focus()
+    return () => prev?.focus?.()
+  }, [staleId])
 
   if (!stale) return null
   const max = Math.max(0, Math.min(MAX_MIN, Math.floor((now - stale.start) / MIN)))
@@ -42,6 +52,22 @@ export function StaleSessionDialog() {
     }
   }
 
+  // Keep Tab inside the dialog.
+  const trap = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return
+    const items = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])')]
+    if (!items.length) return
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
   const btn = 'w-full rounded-2xl py-3.5 font-display text-base font-bold active:scale-[0.98] disabled:opacity-50'
 
   return (
@@ -50,6 +76,7 @@ export function StaleSessionDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="stale-title"
+        onKeyDown={trap}
         className="mb-4 w-[calc(100%-32px)] max-w-sm rounded-3xl border border-white/10 bg-[#15151f] p-6"
         initial={reduce ? { opacity: 0 } : { y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -67,7 +94,7 @@ export function StaleSessionDialog() {
           </div>
         </div>
 
-        <button type="button" disabled={busy} className={`${btn} bg-gradient-to-r from-[#9775fa] to-[#4dabf7] text-white`} onClick={() => void resolve(stale.start + MAX_MIN * MIN)}>
+        <button ref={keepRef} type="button" disabled={busy} className={`${btn} bg-gradient-to-r from-[#9775fa] to-[#4dabf7] text-white`} onClick={() => void resolve(stale.start + MAX_MIN * MIN)}>
           Keep 16h
         </button>
 

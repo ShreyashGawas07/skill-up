@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type ComponentType } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { TIERS } from '@/domain/tiers'
+import type { Habit, HabitState } from '@/domain/types'
 import type { Celebration, CelebrationKind } from '@/feedback/celebrations'
 import { haptic } from '@/feedback/haptics'
 import { playCue, type Cue } from '@/feedback/sound'
@@ -50,6 +51,9 @@ export function CelebrationOverlay() {
   const states = useApp((s) => s.states)
   const settings = useApp((s) => s.settings)
   const dismiss = useApp((s) => s.dismiss)
+  // A forgotten-timer prompt takes precedence: pause celebrations (render and schedule nothing)
+  // until it's resolved, so nothing is consumed unseen underneath it.
+  const hasStale = Object.values(states).some((s) => s.staleSession)
   const reduce = useReduce(motionPref(settings.reduceMotion))
 
   // Keep showing the same item even if a higher-priority one is queued mid-animation.
@@ -77,8 +81,10 @@ export function CelebrationOverlay() {
     }
   }, [queue, habits, skip])
 
-  const key = current && habit ? current.key : undefined
   const spec = current && isFull(current) ? SPEC[current.kind] : undefined
+  const show = !hasStale && current && habit && spec ? { c: current, habit, spec } : undefined
+  const key = show?.c.key
+  const label = show ? `${show.spec.label(show.c)} — ${show.habit.name}` : ''
   const sound = settings.sound
 
   useEffect(() => {
@@ -88,69 +94,97 @@ export function CelebrationOverlay() {
       if (sound) playCue(spec.cue)
     }, reduce ? 0 : spec.at)
     const done = setTimeout(() => skip(key), spec.ms)
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') skip(key)
-    }
-    window.addEventListener('keydown', onKey)
     return () => {
       clearTimeout(cue)
       clearTimeout(done)
-      window.removeEventListener('keydown', onKey)
     }
-    // spec is derived from key; sound/reduce are read at mount of each moment.
+    // spec is derived from key; sound/reduce are read at the start of each moment.
   }, [key])
 
+  // Move focus to each new moment so screen readers and keys land on it.
+  const focusRoot = useCallback((el: HTMLDivElement | null) => {
+    el?.focus({ preventScroll: true })
+  }, [])
+
   return (
-    <AnimatePresence mode="wait">
-      {current && habit && spec && (
-        <motion.div
-          key={current.key}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${spec.label(current)} — ${habit.name}`}
-          data-motion={reduce ? 'reduced' : 'full'}
-          data-kind={current.kind}
-          tabIndex={-1}
-          className="fixed inset-0 z-50 flex cursor-pointer select-none flex-col items-center justify-center gap-3 overflow-hidden bg-[#07070dee] px-4 text-white backdrop-blur-md"
+    <>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only" data-testid="celebration-live">
+        {label}
+      </div>
+      <AnimatePresence mode="wait">
+        {show && <Moment key={show.c.key} {...show} label={label} reduce={reduce} remaining={remaining} state={states[show.c.habitId]} skip={skip} focusRoot={focusRoot} />}
+      </AnimatePresence>
+    </>
+  )
+}
+
+interface MomentProps {
+  c: Celebration
+  habit: Habit
+  spec: Spec
+  state?: HabitState
+  label: string
+  reduce: boolean
+  remaining: number
+  skip(key: string): void
+  focusRoot(el: HTMLDivElement | null): void
+}
+
+const SKIP_KEYS = new Set(['Escape', 'Enter', ' '])
+
+function Moment({ c: current, habit, spec, state, label, reduce, remaining, skip, focusRoot }: MomentProps) {
+  return (
+    <motion.div
+      ref={focusRoot}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      data-motion={reduce ? 'reduced' : 'full'}
+      data-kind={current.kind}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex cursor-pointer select-none flex-col items-center justify-center gap-3 overflow-hidden bg-[#07070dee] px-4 text-white backdrop-blur-md"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      onClick={() => skip(current.key)}
+      onKeyDown={(e) => {
+        if (!SKIP_KEYS.has(e.key)) return
+        e.preventDefault()
+        skip(current.key)
+      }}
+    >
+      <div className="absolute left-0 right-0 top-0 flex items-center justify-center pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <span className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-sm text-white/80">
+          <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: habit.color, boxShadow: `0 0 8px ${habit.color}` }} />
+          {habit.name}
+        </span>
+      </div>
+
+      <div className="relative flex flex-col items-center gap-3 text-center">
+        <spec.Scene c={current} habit={habit} state={state} reduce={reduce} />
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <motion.p
+          className="text-xs uppercase tracking-[0.3em] text-white/40"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          onClick={() => skip(current.key)}
+          transition={{ delay: 1.2, duration: 0.6 }}
         >
-          <div className="absolute left-0 right-0 top-0 flex items-center justify-center pt-[max(1.25rem,env(safe-area-inset-top))]">
-            <span className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-sm text-white/80">
-              <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: habit.color, boxShadow: `0 0 8px ${habit.color}` }} />
-              {habit.name}
-            </span>
+          Tap to continue{remaining > 1 ? ` · ${remaining - 1} more` : ''}
+        </motion.p>
+        {!reduce && (
+          <div className="h-0.5 w-24 overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className="h-full origin-left bg-white/50"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: spec.ms / 1000, ease: 'linear' }}
+            />
           </div>
-
-          <div className="relative flex flex-col items-center gap-3 text-center">
-            <spec.Scene c={current} habit={habit} state={states[current.habitId]} reduce={reduce} />
-          </div>
-
-          <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-            <motion.p
-              className="text-xs uppercase tracking-[0.3em] text-white/40"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.2, duration: 0.6 }}
-            >
-              Tap to continue{remaining > 1 ? ` · ${remaining - 1} more` : ''}
-            </motion.p>
-            {!reduce && (
-              <div className="h-0.5 w-24 overflow-hidden rounded-full bg-white/10">
-                <motion.div
-                  className="h-full origin-left bg-white/50"
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ duration: spec.ms / 1000, ease: 'linear' }}
-                />
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </div>
+    </motion.div>
   )
 }

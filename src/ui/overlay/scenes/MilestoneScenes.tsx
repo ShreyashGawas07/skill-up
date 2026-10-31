@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { iconGlyph } from '@/ui/icons'
 import { Emblem } from '@/ui/art/Emblem'
@@ -7,27 +7,39 @@ import { Glyph } from '@/ui/screens/parts/Glyphs'
 import { fmtInt } from '@/ui/screens/parts/format'
 import { anim, Glow, Kicker, Rays, rnd, Shockwave, Slam, Sparks, Stage, Sub, type SceneProps } from './shared'
 
+/** Above the overlay (z-50), below the stale-session dialog (z-60). */
+const CONFETTI_Z = 55
+
 const GOLD = ['#ffcf3f', '#fff3b0', '#ff9f1c', '#ffffff']
 
-/** Timed canvas-confetti bursts; none under reduce motion. Cleared on unmount (skip). */
+/** Timed canvas-confetti bursts; none under reduce motion. Cleared (and reset) on skip or unmount. */
 function useFireworks(reduce: boolean, bursts: { at: number; x: number; y: number; colors: string[]; n?: number }[]) {
+  // Stop as soon as the moment is skipped (exit starts), not only when it unmounts.
+  const present = useIsPresent()
   useEffect(() => {
-    if (reduce) return
+    if (reduce || !present) return
     const ids = bursts.map((b) =>
       setTimeout(() => {
         try {
           void confetti({
             particleCount: b.n ?? 90, spread: 360, startVelocity: 32, gravity: 0.7, ticks: 160, scalar: 0.9,
-            origin: { x: b.x, y: b.y }, colors: b.colors, zIndex: 60,
+            origin: { x: b.x, y: b.y }, colors: b.colors, zIndex: CONFETTI_Z,
           })
         } catch {
           // no canvas available
         }
       }, b.at),
     )
-    return () => ids.forEach(clearTimeout)
+    return () => {
+      ids.forEach(clearTimeout)
+      try {
+        confetti.reset?.()
+      } catch {
+        // no canvas available
+      }
+    }
     // Bursts are fixed per scene mount.
-  }, [reduce])
+  }, [reduce, present])
 }
 
 function Medal({ color, icon }: { color: string; icon: string }) {

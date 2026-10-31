@@ -8,7 +8,7 @@ const sched = vi.hoisted(() => ({
 }))
 vi.mock('@/notify/scheduler', () => sched)
 vi.mock('@capacitor/app', () => ({ App: { addListener: vi.fn(async () => ({ remove: async () => {} })) } }))
-const confetti = vi.hoisted(() => vi.fn())
+const confetti = vi.hoisted(() => Object.assign(vi.fn(), { reset: vi.fn() }))
 vi.mock('canvas-confetti', () => ({ default: confetti }))
 const haptic = vi.hoisted(() => ({ tick: vi.fn(), success: vi.fn(), heavy: vi.fn(), warn: vi.fn() }))
 vi.mock('@/feedback/haptics', () => ({ haptic }))
@@ -66,6 +66,7 @@ beforeEach(async () => {
   setClock(() => now)
   useApp.setState(REAL)
   confetti.mockClear()
+  confetti.reset.mockClear()
   Object.values(haptic).forEach((f) => f.mockClear())
   sound.playCue.mockClear()
   await S().load()
@@ -195,6 +196,125 @@ describe('CelebrationOverlay', () => {
     }
   })
 
+  it('a tap racing the auto-advance dismisses exactly once', () => {
+    const dismiss = vi.fn(async () => {})
+    seed([cel('a', 'rankLost', 3)])
+    act(() => useApp.setState({ dismiss }))
+    vi.useFakeTimers()
+    try {
+      render(<CelebrationOverlay />)
+      act(() => vi.advanceTimersByTime(2399))
+      fireEvent.click(screen.getByRole('dialog'))
+      act(() => vi.advanceTimersByTime(10))
+      fireEvent.click(screen.getByRole('dialog'))
+      act(() => vi.advanceTimersByTime(5000))
+      expect(dismiss).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('focuses each moment, announces it, and skips on Enter/Space/Escape (default prevented)', async () => {
+    seed([cel('a', 'rankUp', 5), cel('a', 'streak', 14), cel('a', 'rankRecovered', 4)])
+    render(<CelebrationOverlay />)
+    const first = screen.getByRole('dialog')
+    expect(first).toHaveFocus()
+    expect(screen.getByTestId('celebration-live')).toHaveAttribute('aria-live', 'assertive')
+    expect(screen.getByTestId('celebration-live')).toHaveTextContent('Rank up: Expert — Guitar')
+    let notPrevented = true
+    await act(async () => {
+      notPrevented = fireEvent.keyDown(first, { key: 'Enter' })
+    })
+    expect(notPrevented).toBe(false)
+    expect(S().queue).toHaveLength(2)
+    await waitFor(() => expect(screen.getByRole('dialog', { name: /14 day streak/ })).toHaveFocus())
+    expect(screen.getByTestId('celebration-live')).toHaveTextContent('14 day streak — Guitar')
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: ' ' })
+    })
+    await waitFor(() => expect(screen.getByRole('dialog', { name: /rank recovered/i })).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    })
+    expect(S().queue).toHaveLength(0)
+  })
+
+  it('ignores keys pressed outside the overlay (no global listener)', () => {
+    const dismiss = vi.fn(async () => {})
+    seed([cel('a', 'rankUp', 5)])
+    act(() => useApp.setState({ dismiss }))
+    render(<CelebrationOverlay />)
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(dismiss).not.toHaveBeenCalled()
+  })
+
+  it('pauses (renders and schedules nothing) while a stale session is open, then resumes', () => {
+    const dismiss = vi.fn(async () => {})
+    seed([cel('a', 'formed')], { staleSession: { id: 's', habitId: 'a', start: now - 20 * 3600_000 } }, { ...DEFAULT_SETTINGS, sound: true, reduceMotion: 'off' })
+    act(() => useApp.setState({ dismiss }))
+    vi.useFakeTimers()
+    try {
+      render(<CelebrationOverlay />)
+      expect(screen.queryByRole('dialog')).toBeNull()
+      act(() => vi.advanceTimersByTime(20_000))
+      expect(dismiss).not.toHaveBeenCalled()
+      expect(haptic.heavy).not.toHaveBeenCalled()
+      expect(sound.playCue).not.toHaveBeenCalled()
+      expect(confetti).not.toHaveBeenCalled()
+
+      act(() => useApp.setState({ states: { a: state('a') } }))
+      expect(screen.getByRole('dialog', { name: /habit formed/i })).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(4300))
+      expect(haptic.heavy).toHaveBeenCalledTimes(1)
+      expect(dismiss).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clears the cue, auto-advance and fireworks timers when skipped', () => {
+    const dismiss = vi.fn(async (k: string) => {
+      useApp.setState({ queue: S().queue.filter((c) => c.key !== k) })
+    })
+    seed([cel('a', 'formed')], {}, { ...DEFAULT_SETTINGS, sound: true, reduceMotion: 'off' })
+    act(() => useApp.setState({ dismiss }))
+    vi.useFakeTimers()
+    try {
+      render(<CelebrationOverlay />)
+      act(() => vi.advanceTimersByTime(100))
+      act(() => {
+        fireEvent.click(screen.getByRole('dialog'))
+      })
+      act(() => vi.advanceTimersByTime(10_000))
+      expect(dismiss).toHaveBeenCalledTimes(1)
+      expect(haptic.heavy).not.toHaveBeenCalled()
+      expect(sound.playCue).not.toHaveBeenCalled()
+      expect(confetti).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clears timers and resets confetti on unmount', () => {
+    const dismiss = vi.fn(async () => {})
+    seed([cel('a', 'formed')], {}, { ...DEFAULT_SETTINGS, sound: true, reduceMotion: 'off' })
+    act(() => useApp.setState({ dismiss }))
+    vi.useFakeTimers()
+    try {
+      const { unmount } = render(<CelebrationOverlay />)
+      act(() => vi.advanceTimersByTime(100))
+      unmount()
+      expect(confetti.reset).toHaveBeenCalled()
+      act(() => vi.advanceTimersByTime(10_000))
+      expect(dismiss).not.toHaveBeenCalled()
+      expect(haptic.heavy).not.toHaveBeenCalled()
+      expect(sound.playCue).not.toHaveBeenCalled()
+      expect(confetti).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('dismisses an item whose habit no longer exists', async () => {
     act(() => useApp.setState({ habits: [], states: {}, queue: [cel('gone', 'rankUp', 3)] }))
     render(<CelebrationOverlay />)
@@ -254,6 +374,26 @@ describe('StaleSessionDialog', () => {
       fireEvent.click(screen.getByRole('button', { name: /stop at 10:30 AM/i }))
     })
     expect(resolveStale).toHaveBeenCalledWith(start + 150 * 60_000)
+  })
+
+  it('autofocuses "Keep 16h", traps Tab inside, and restores focus on close', () => {
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    outside.focus()
+    seedStale()
+    render(<StaleSessionDialog />)
+    const keep = screen.getByRole('button', { name: 'Keep 16h' })
+    const last = screen.getByRole('button', { name: /stop at/i })
+    expect(keep).toHaveFocus()
+    last.focus()
+    fireEvent.keyDown(last, { key: 'Tab' })
+    expect(keep).toHaveFocus()
+    fireEvent.keyDown(keep, { key: 'Tab', shiftKey: true })
+    expect(last).toHaveFocus()
+    act(() => useApp.setState({ states: { a: state('a') } }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(outside).toHaveFocus()
+    outside.remove()
   })
 
   it('offers no way to type hours or extend past 16h', () => {

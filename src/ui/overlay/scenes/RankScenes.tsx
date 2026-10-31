@@ -119,8 +119,8 @@ export function RankLostScene({ c, state, reduce }: SceneProps) {
             aria-hidden
             className="absolute h-1 w-40 rounded-full bg-white/15"
             style={{ top: `calc(50% + ${top + i * RUNG}px + 48px)` }}
-            initial={{ opacity: 0, scaleX: 0.3 }}
-            animate={{ opacity: 1, scaleX: 1 }}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, scaleX: 0.3 }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, scaleX: 1 }}
             transition={{ delay: 0.05 * i, duration: reduce ? 0.3 : 0.4 }}
           />
         ))}

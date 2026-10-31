@@ -37,7 +37,7 @@ export type EventType =
   | 'HABIT_FORMED'
   | 'ETERNAL'
 
-/** key = `${type}:${day}` or `${type}:${day}:${value}`; deterministic for the same inputs. */
+/** key = `${type}:${day}` or `${type}:${day}:${value}` (OVERTIME always `${type}:${day}`); deterministic for the same inputs. */
 export interface AppEvent {
   key: string
   type: EventType

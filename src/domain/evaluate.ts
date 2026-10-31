@@ -41,8 +41,9 @@ export function evaluate(habit: Habit, sessions: Session[], now: number): HabitS
   const minutes = minutesByDay(counted, now)
 
   const events: AppEvent[] = []
+  // OVERTIME's value grows while a session runs, so its key omits the value to stay stable.
   const emit = (type: EventType, day: DayKey, value?: number) => {
-    const key = value === undefined ? `${type}:${day}` : `${type}:${day}:${value}`
+    const key = value === undefined || type === 'OVERTIME' ? `${type}:${day}` : `${type}:${day}:${value}`
     events.push(value === undefined ? { key, type, habitId: habit.id, day } : { key, type, habitId: habit.id, day, value })
   }
 

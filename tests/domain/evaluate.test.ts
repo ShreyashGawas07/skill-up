@@ -68,7 +68,19 @@ describe('evaluate: day status', () => {
     expect(s.overtimeMinutes).toBe(60)
     expect(s.totalMinutes).toBe(180)
     expect(s.days[1].status).toBe('missed')
-    expect(ofType(s, 'OVERTIME').map((e) => e.key)).toEqual([`OVERTIME:${k(0)}:60`])
+    expect(ofType(s, 'OVERTIME').map((e) => [e.key, e.value])).toEqual([[`OVERTIME:${k(0)}`, 60]])
+  })
+
+  it('OVERTIME key is stable while a running session grows past the commitment', () => {
+    const open: Session = { id: 'open', habitId: 'h', start: at(0, 8) }
+    const a = evaluate(makeHabit(), [open], at(0, 8) + 130 * 60000)
+    const b = evaluate(makeHabit(), [open], at(0, 8) + 145 * 60000)
+    const oa = ofType(a, 'OVERTIME')
+    const ob = ofType(b, 'OVERTIME')
+    expect(oa.map((e) => e.key)).toEqual([`OVERTIME:${k(0)}`])
+    expect(ob.map((e) => e.key)).toEqual(oa.map((e) => e.key))
+    expect(oa[0].value).toBe(10)
+    expect(ob[0].value).toBe(25)
   })
 })
 
@@ -198,6 +210,7 @@ describe('evaluate: rank up, milestones, eternal', () => {
     expect(s.days).toHaveLength(3)
     expect(ofType(s, 'ETERNAL').map((e) => e.key)).toEqual([`ETERNAL:${k(2)}`])
     expect(ofType(s, 'RANK_LOST')).toHaveLength(1)
+    expect(ofType(s, 'RANK_UP').filter((e) => e.day === k(2)).map((e) => e.value)).toEqual([10])
   })
 })
 

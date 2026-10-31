@@ -1,3 +1,4 @@
+import { format, parse } from 'date-fns'
 import { db } from './db'
 import { repo, type Settings } from './repo'
 import type { Habit, Session } from '@/domain/types'
@@ -13,12 +14,14 @@ export interface Backup {
 }
 
 export async function exportBackup(): Promise<Backup> {
-  const [habits, sessions, seen, settings] = await Promise.all([
-    repo.listHabits(),
-    repo.listSessions(),
-    repo.seenKeys(),
-    repo.getSettings(),
-  ])
+  const [habits, sessions, seen, settings] = await db.transaction(
+    'r',
+    db.habits,
+    db.sessions,
+    db.seen,
+    db.settings,
+    () => Promise.all([repo.listHabits(), repo.listSessions(), repo.seenKeys(), repo.getSettings()]),
+  )
   return { app: 'skillup', version: 1, exportedAt: Date.now(), habits, sessions, seen: [...seen], settings }
 }
 
@@ -28,12 +31,20 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const isStr = (v: unknown): v is string => typeof v === 'string'
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const DAY = /^\d{4}-\d{2}-\d{2}$/
+const isRealDay = (d: string) => {
+  if (!DAY.test(d)) return false
+  const t = parse(d, 'yyyy-MM-dd', new Date(2000, 0, 1))
+  return !Number.isNaN(t.getTime()) && format(t, 'yyyy-MM-dd') === d
+}
 
 function habitError(h: unknown, i: number): string | null {
   const p = `habits[${i}]`
   if (!isObj(h)) return `${p} is not an object`
   for (const k of ['id', 'name', 'icon', 'color', 'reminderTime'] as const) {
     if (!isStr(h[k])) return `${p}.${k} must be a string`
+  }
+  if ((h.id as string) === '' || (h.id as string).includes(':')) {
+    return `${p}.id must be non-empty and must not contain ':'`
   }
   if (!isNum(h.createdAt)) return `${p}.createdAt must be a number`
   if (!Number.isInteger(h.targetHours) || (h.targetHours as number) <= 0) {
@@ -44,8 +55,12 @@ function habitError(h: unknown, i: number): string | null {
     return `${p}.commitmentHistory must be a non-empty array`
   }
   for (const [j, c] of h.commitmentHistory.entries()) {
-    if (!isObj(c) || !isStr(c.fromDate) || !DAY.test(c.fromDate)) {
-      return `${p}.commitmentHistory[${j}].fromDate must be YYYY-MM-DD`
+    if (!isObj(c) || !isStr(c.fromDate) || !isRealDay(c.fromDate)) {
+      return `${p}.commitmentHistory[${j}].fromDate must be a real YYYY-MM-DD date`
+    }
+    const prev = j > 0 ? (h.commitmentHistory[j - 1] as { fromDate: string }).fromDate : undefined
+    if (prev !== undefined && c.fromDate <= prev) {
+      return `${p}.commitmentHistory must be sorted ascending by fromDate`
     }
     const m = c.dailyMinutes
     if (!Number.isInteger(m) || (m as number) < 15 || (m as number) > 720 || (m as number) % 15 !== 0) {

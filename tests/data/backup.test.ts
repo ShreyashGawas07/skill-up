@@ -83,9 +83,33 @@ describe('backup', () => {
     expect(err(mk({ sessions: [session('s1', 'zzz')] }))).toMatch(/habit/i)
   })
 
+  it('failed import rolls back and leaves db unchanged', async () => {
+    await repo.putHabit(habit('keep'))
+    await repo.putSession(session('k1', 'keep'))
+    const bad = {
+      app: 'skillup', version: 1, exportedAt: 1, habits: [habit('x')],
+      sessions: [session('dup', 'x'), session('dup', 'x')], seen: [],
+      settings: { theme: 'system', sound: false, reduceMotion: 'system' },
+    } as Parameters<typeof importBackup>[0]
+    await expect(importBackup(bad)).rejects.toBeDefined()
+    expect((await repo.listHabits()).map((h) => h.id)).toEqual(['keep'])
+    expect((await repo.listSessions()).map((x) => x.id)).toEqual(['k1'])
+  })
+
+  it('rejects bad habit ids, impossible dates and unsorted history', () => {
+    expect(err(mk({ habits: [habit('')], sessions: [] }))).toMatch(/id/)
+    expect(err(mk({ habits: [habit('a:b')], sessions: [] }))).toMatch(/id/)
+    const ch = (...d: string[]) => d.map((fromDate) => ({ fromDate, dailyMinutes: 30 }))
+    expect(err(mk({ habits: [habit('a', { commitmentHistory: ch('2026-02-30') })] }))).toMatch(/fromDate/)
+    expect(err(mk({ habits: [habit('a', { commitmentHistory: ch('2026-13-01') })] }))).toMatch(/fromDate/)
+    expect(err(mk({ habits: [habit('a', { commitmentHistory: ch('2026-03-01', '2026-02-01') })] }))).toMatch(/sorted/)
+    expect(parse(mk({ habits: [habit('a', { commitmentHistory: ch('2026-01-01', '2026-02-01') })] })).ok).toBe(true)
+  })
+
   it('invalid backup leaves db unchanged', async () => {
     await repo.putHabit(habit('keep'))
     const r = parse(mk({ version: 99 }))
+    expect(r.ok).toBe(false)
     if (r.ok) await importBackup(r.backup)
     expect((await repo.listHabits()).map((h) => h.id)).toEqual(['keep'])
   })

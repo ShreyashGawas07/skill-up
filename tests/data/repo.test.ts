@@ -27,11 +27,12 @@ describe('repo', () => {
     await repo.putHabit(habit('b'))
     await repo.putSession({ id: 's1', habitId: 'a', start: 1, end: 2 })
     await repo.putSession({ id: 's2', habitId: 'b', start: 1, end: 2 })
-    await repo.markSeen(['RANK_UP:2026-01-01:a', 'DAY_COMPLETE:2026-01-01'])
+    await repo.markSeen(['a:RANK_UP:2026-01-01:3', 'a:DAY_COMPLETE:2026-01-01', 'b:DAY_COMPLETE:2026-01-01'])
     await repo.deleteHabit('a')
     expect((await repo.listHabits()).map((h) => h.id)).toEqual(['b'])
     expect((await repo.listSessions()).map((s) => s.id)).toEqual(['s2'])
     expect((await repo.listSessions('a'))).toEqual([])
+    expect(await repo.seenKeys()).toEqual(new Set(['b:DAY_COMPLETE:2026-01-01']))
   })
 
   it('openSession returns the session with no end', async () => {

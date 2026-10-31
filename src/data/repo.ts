@@ -15,8 +15,9 @@ export const repo = {
     await db.habits.put(h)
   },
   async deleteHabit(id: string): Promise<void> {
-    await db.transaction('rw', db.habits, db.sessions, async () => {
+    await db.transaction('rw', db.habits, db.sessions, db.seen, async () => {
       await db.sessions.where('habitId').equals(id).delete()
+      await db.seen.where('key').startsWith(`${id}:`).delete()
       await db.habits.delete(id)
     })
   },
@@ -28,9 +29,11 @@ export const repo = {
   async openSession(): Promise<Session | undefined> {
     return (await db.sessions.toArray()).find((s) => s.end === undefined)
   },
+  /** Keys are composite `${habitId}:${eventKey}` (habit ids are UUIDs, no ':'). */
   async seenKeys(): Promise<Set<string>> {
     return new Set((await db.seen.toArray()).map((r) => r.key))
   },
+  /** Keys must be composite `${habitId}:${eventKey}`; deleteHabit prunes by the `${habitId}:` prefix. */
   async markSeen(keys: string[]): Promise<void> {
     await db.seen.bulkPut(keys.map((key) => ({ key })))
   },

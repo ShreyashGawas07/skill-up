@@ -2,3 +2,7 @@ node_modules/
 dist/
 .superpowers/
 android/app/build/
+dist-ssr/
+*.local
+*.log
+.DS_Store

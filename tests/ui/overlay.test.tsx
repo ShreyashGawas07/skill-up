@@ -5,6 +5,8 @@ import { MotionGlobalConfig } from 'framer-motion'
 const sched = vi.hoisted(() => ({
   applySchedule: vi.fn(async (_specs: unknown[]) => {}),
   registerNotificationActions: vi.fn(async () => {}),
+  exactAlarmStatus: vi.fn(async () => 'granted' as const),
+  openExactAlarmSetting: vi.fn(async () => {}),
 }))
 vi.mock('@/notify/scheduler', () => sched)
 vi.mock('@capacitor/app', () => ({ App: { addListener: vi.fn(async () => ({ remove: async () => {} })) } }))

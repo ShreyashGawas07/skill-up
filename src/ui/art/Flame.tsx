@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { motion } from 'framer-motion'
+import { FLAME_CORE as CORE, FLAME_MID as MID, FLAME_OUTER as OUTER } from './flamePath'
 import { useReduce } from './useReduce'
 
 export type FlameBand = 'orange' | 'blue' | 'violet'
@@ -19,10 +20,6 @@ export function flameScale(streak: number): number {
   const s = Math.max(0, streak)
   return 0.6 + 0.4 * Math.min(1, Math.log(1 + s) / Math.log(366))
 }
-
-const OUTER = 'M32 4 C38 18 54 28 54 48 C54 64 44 76 32 76 C20 76 10 64 10 48 C10 36 18 30 22 20 C24 30 28 32 30 30 C28 20 28 12 32 4 Z'
-const MID = 'M33 22 C38 34 46 40 46 52 C46 64 40 72 32 72 C24 72 18 64 18 54 C18 46 24 42 26 36 C28 42 31 42 32 40 C30 34 30 28 33 22 Z'
-const CORE = 'M32 42 C36 50 40 54 40 60 C40 67 36 71 32 71 C28 71 24 67 24 61 C24 55 29 51 32 42 Z'
 
 interface Props {
   streak: number

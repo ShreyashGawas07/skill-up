@@ -57,3 +57,25 @@ export async function requestNotificationPermission(): Promise<boolean> {
   const { display } = await LocalNotifications.requestPermissions()
   return display === 'granted'
 }
+
+export type ExactAlarm = 'granted' | 'denied' | 'unsupported'
+
+/**
+ * Android 12+ "Alarms & reminders" access. Without it the plugin falls back to inexact alarms and
+ * reminders can arrive late. 'unsupported' on web (and if the platform doesn't implement it).
+ */
+export async function exactAlarmStatus(): Promise<ExactAlarm> {
+  if (!native()) return 'unsupported'
+  try {
+    const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting()
+    return exact_alarm === 'granted' ? 'granted' : 'denied'
+  } catch {
+    return 'unsupported'
+  }
+}
+
+/** Opens the system "Alarms & reminders" screen for SkillUp (no-op on web). Re-check on resume. */
+export async function openExactAlarmSetting(): Promise<void> {
+  if (!native()) return
+  await LocalNotifications.changeExactNotificationSetting()
+}

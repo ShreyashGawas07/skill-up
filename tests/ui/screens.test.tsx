@@ -7,6 +7,8 @@ const sched = vi.hoisted(() => ({
   registerNotificationActions: vi.fn(async () => {}),
   notificationPermission: vi.fn(async (): Promise<'granted' | 'denied' | 'prompt'> => 'granted'),
   requestNotificationPermission: vi.fn(async () => true),
+  exactAlarmStatus: vi.fn(async (): Promise<'granted' | 'denied' | 'unsupported'> => 'granted'),
+  openExactAlarmSetting: vi.fn(async () => {}),
 }))
 vi.mock('@/notify/scheduler', () => sched)
 vi.mock('@capacitor/app', () => ({ App: { addListener: vi.fn(async () => ({ remove: async () => {} })) } }))
@@ -37,6 +39,7 @@ import { repo } from '@/data/repo'
 import { importBackup } from '@/data/backup'
 import { dayKey } from '@/domain/days'
 import type { Habit, HabitState, Session } from '@/domain/types'
+import { App } from '@capacitor/app'
 import { setClock, useApp } from '@/store/useApp'
 import { HabitDetail } from '@/ui/screens/HabitDetail'
 import { ConfirmSheet } from '@/ui/screens/parts/ConfirmSheet'
@@ -98,6 +101,8 @@ beforeEach(async () => {
   vi.mocked(importBackup).mockClear()
   sched.notificationPermission.mockReset().mockResolvedValue('granted')
   sched.requestNotificationPermission.mockClear()
+  sched.exactAlarmStatus.mockReset().mockResolvedValue('granted')
+  sched.openExactAlarmSetting.mockClear()
   await S().load()
 })
 
@@ -442,6 +447,49 @@ describe('Settings', () => {
     expect(S().settings.sound).toBe(true)
   })
 
+  it('exact reminders: no row on web', async () => {
+    await mount(<Settings onBack={onBack} />)
+    expect(screen.queryByText('Exact reminders')).toBeNull()
+    expect(sched.exactAlarmStatus).not.toHaveBeenCalled()
+  })
+
+  it('exact reminders: "On" when granted (native)', async () => {
+    platform.native = true
+    await mount(<Settings onBack={onBack} />)
+    const row = (await screen.findByText('Exact reminders')).parentElement!
+    expect(within(row).getByText('On')).toBeInTheDocument()
+    expect(within(row).queryByRole('button')).toBeNull()
+  })
+
+  it('exact reminders: Enable opens the system setting and re-checks (native)', async () => {
+    platform.native = true
+    sched.exactAlarmStatus.mockResolvedValue('denied')
+    await mount(<Settings onBack={onBack} />)
+    const btn = await screen.findByRole('button', { name: 'Enable exact reminders' })
+    sched.exactAlarmStatus.mockResolvedValue('granted')
+    await act(async () => {
+      fireEvent.click(btn)
+    })
+    expect(sched.openExactAlarmSetting).toHaveBeenCalledOnce()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Enable exact reminders' })).toBeNull())
+    expect(within(screen.getByText('Exact reminders').parentElement!).getByText('On')).toBeInTheDocument()
+  })
+
+  it('exact reminders: re-checks when the app resumes (native)', async () => {
+    platform.native = true
+    sched.exactAlarmStatus.mockResolvedValue('denied')
+    vi.mocked(App.addListener).mockClear()
+    await mount(<Settings onBack={onBack} />)
+    await screen.findByRole('button', { name: 'Enable exact reminders' })
+    const calls = vi.mocked(App.addListener).mock.calls as unknown as [string, (s: { isActive: boolean }) => void][]
+    const resume = calls.filter(([ev]) => ev === 'appStateChange').map(([, fn]) => fn)
+    sched.exactAlarmStatus.mockResolvedValue('granted')
+    await act(async () => {
+      resume.forEach((fn) => fn({ isActive: true }))
+    })
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Enable exact reminders' })).toBeNull())
+  })
+
   it('back button returns', async () => {
     await mount(<Settings onBack={onBack} />)
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
@@ -465,11 +513,35 @@ describe('PermissionBanner on Home', () => {
     expect(sched.notificationPermission).not.toHaveBeenCalled()
   })
 
+  it('warns when notifications are on but exact alarms are denied (native); Allow opens the setting', async () => {
+    platform.native = true
+    sched.exactAlarmStatus.mockResolvedValue('denied')
+    await mount(<Home onNavigate={nav} />)
+    const banner = await screen.findByRole('region', { name: 'Exact alarms off' })
+    expect(within(banner).getByText('Reminders may be late — allow exact alarms')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Notifications off' })).toBeNull()
+    await act(async () => {
+      fireEvent.click(within(banner).getByRole('button', { name: 'Allow' }))
+    })
+    expect(sched.openExactAlarmSetting).toHaveBeenCalledOnce()
+  })
+
+  it('shows only the notifications banner when both are denied (native)', async () => {
+    platform.native = true
+    sched.notificationPermission.mockResolvedValue('denied')
+    sched.exactAlarmStatus.mockResolvedValue('denied')
+    await mount(<Home onNavigate={nav} />)
+    await screen.findByRole('region', { name: 'Notifications off' })
+    expect(screen.queryByRole('region', { name: 'Exact alarms off' })).toBeNull()
+  })
+
   it('is hidden when permission is granted on native', async () => {
     platform.native = true
     await mount(<Home onNavigate={nav} />)
     await waitFor(() => expect(sched.notificationPermission).toHaveBeenCalled())
+    await waitFor(() => expect(sched.exactAlarmStatus).toHaveBeenCalled())
     expect(screen.queryByRole('region', { name: 'Notifications off' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Exact alarms off' })).toBeNull()
   })
 })
 

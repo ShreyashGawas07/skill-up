@@ -4,14 +4,21 @@ import { useApp } from '@/store/useApp'
 import { useReduce } from '@/ui/art/useReduce'
 import { motionPref } from '@/ui/screens/parts/format'
 import { Glyph } from '@/ui/screens/parts/Glyphs'
-import { usePermission } from './usePermission'
+import { openExactAlarmSetting } from '@/notify/scheduler'
+import { useExactAlarm, usePermission } from './usePermission'
 
 /** Android has no runtime way back to the prompt once denied, so we point the user at system settings. */
 export const OPEN_SETTINGS_HINT = 'Open settings › Apps › SkillUp › Notifications'
 
-/** Persistent banner at the top of Home while notifications are denied (native only). */
+export const EXACT_ALARM_TEXT = 'Reminders may be late — allow exact alarms'
+
+/**
+ * Persistent banner at the top of Home (native only): while notifications are denied, or while they
+ * are allowed but exact alarms are not (Android 12+), since reminders could then arrive late.
+ */
 export function PermissionBanner() {
   const [perm] = usePermission()
+  const [exact, recheckExact] = useExactAlarm()
   const [help, setHelp] = useState(false)
   const reduce = useReduce(motionPref(useApp((s) => s.settings.reduceMotion)))
   const hidden = reduce ? { opacity: 0 } : { opacity: 0, y: -8 }
@@ -20,6 +27,7 @@ export function PermissionBanner() {
     <AnimatePresence>
       {perm === 'denied' && (
         <motion.section
+          key="notifications"
           aria-label="Notifications off"
           className="mb-4 flex items-start gap-3 rounded-3xl border border-[#ffa94d]/30 bg-[#ffa94d]/10 p-3"
           initial={hidden}
@@ -39,6 +47,28 @@ export function PermissionBanner() {
               </button>
             )}
           </div>
+        </motion.section>
+      )}
+      {perm === 'granted' && exact === 'denied' && (
+        <motion.section
+          key="exact"
+          aria-label="Exact alarms off"
+          className="mb-4 flex items-center gap-3 rounded-3xl border border-[#ffa94d]/30 bg-[#ffa94d]/10 p-3"
+          initial={hidden}
+          animate={{ opacity: 1, y: 0 }}
+          exit={hidden}
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ffa94d]/20 text-[#ffa94d]">
+            <Glyph name="alarm" />
+          </span>
+          <p className="min-w-0 flex-1 text-sm font-semibold">{EXACT_ALARM_TEXT}</p>
+          <button
+            type="button"
+            onClick={() => void openExactAlarmSetting().then(recheckExact, () => {})}
+            className="min-h-[44px] shrink-0 rounded-2xl bg-[#ffa94d]/20 px-3 text-sm font-semibold text-[#ffa94d]"
+          >
+            Allow
+          </button>
         </motion.section>
       )}
     </AnimatePresence>

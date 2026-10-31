@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { notificationPermission } from '@/notify/scheduler'
+import { exactAlarmStatus, notificationPermission, type ExactAlarm } from '@/notify/scheduler'
 
 /** 'unsupported' = not running natively (web preview): no local notifications at all. */
 export type Permission = 'granted' | 'denied' | 'prompt' | 'unsupported'
 
-/** Current notification permission; on native, re-checked on mount and whenever the app resumes. */
-export function usePermission(): [Permission | undefined, () => Promise<void>] {
+/** Reads a native status on mount and whenever the app resumes; 'unsupported' on web. */
+function useNativeStatus<T>(read: () => Promise<T>): [T | 'unsupported' | undefined, () => Promise<void>] {
   const native = Capacitor.isNativePlatform()
-  const [perm, setPerm] = useState<Permission | undefined>(native ? undefined : 'unsupported')
+  const [value, setValue] = useState<T | 'unsupported' | undefined>(native ? undefined : 'unsupported')
   const check = useCallback(async () => {
     if (!native) return
     try {
-      setPerm(await notificationPermission())
+      setValue(await read())
     } catch {
-      setPerm(undefined)
+      setValue(undefined)
     }
-  }, [native])
+  }, [native, read])
 
   useEffect(() => {
     if (!native) return
@@ -42,5 +42,15 @@ export function usePermission(): [Permission | undefined, () => Promise<void>] {
     }
   }, [check, native])
 
-  return [perm, check]
+  return [value, check]
+}
+
+/** Current notification permission; on native, re-checked on mount and whenever the app resumes. */
+export function usePermission(): [Permission | undefined, () => Promise<void>] {
+  return useNativeStatus(notificationPermission)
+}
+
+/** Android exact-alarm ("Alarms & reminders") access; re-checked on resume (the user returns from system settings). */
+export function useExactAlarm(): [ExactAlarm | undefined, () => Promise<void>] {
+  return useNativeStatus(exactAlarmStatus)
 }

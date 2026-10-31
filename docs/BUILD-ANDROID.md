@@ -33,8 +33,8 @@ To open the project in Android Studio instead: `npx cap open android`, then *Run
 
 All generated from the app's own SVG art with `@resvg/resvg-js`:
 
-- `drawable/rank_1.png … rank_10.png` (256 px) — tier emblems from `emblemSvg()`, used as the notification **large icon** (`largeIcon: 'rank_N'`).
-- `drawable/ic_stat_flame.png` (96 px) — white flame on transparent, the notification **small icon** (`smallIcon: 'ic_stat_flame'`).
+- `drawable-nodpi/rank_1.png … rank_10.png` (256 px, nodpi so Android never rescales them) — tier emblems from `emblemSvg()`, used as the notification **large icon** (`largeIcon: 'rank_N'`).
+- `drawable/ic_stat_flame.png` (96 px) — white flame on transparent (path shared with the in-app flame via `src/ui/art/flamePath.ts`), the notification **small icon** (`smallIcon: 'ic_stat_flame'`).
 - `mipmap-*/ic_launcher.png`, `ic_launcher_round.png` (48/72/96/144/192 px) — tier-10 emblem on `#0b0b12`.
 - `mipmap-*/ic_launcher_foreground.png` (108 dp layers) + `ic_launcher_background` colour `#0B0B12` — adaptive icon (Android 8+).
 - `drawable*/splash.png` — tier-10 emblem centred on `#0b0b12`, at each existing splash size.
@@ -44,7 +44,11 @@ Re-run `npm run icons` (or `npm run android`) after changing emblem art.
 ### Permissions (`android/app/src/main/AndroidManifest.xml`)
 
 `POST_NOTIFICATIONS` (Android 13+ runtime prompt), `SCHEDULE_EXACT_ALARM` (exact reminder times; scheduled
-notifications use `allowWhileIdle: true` so they fire in Doze), `VIBRATE` (haptics). The local-notifications plugin
+notifications use `allowWhileIdle: true` so they fire in Doze). On Android 14+ exact alarms are **off by default**:
+without them reminders fall back to inexact alarms and may arrive late. The app shows a Home banner
+("Reminders may be late — allow exact alarms") and a Settings → *Exact reminders* row whose **Enable** button opens
+the system *Alarms & reminders* screen; the state is re-checked when you return to the app.
+`VIBRATE` (haptics). The local-notifications plugin
 adds `RECEIVE_BOOT_COMPLETED` / `WAKE_LOCK` itself (reschedules after reboot).
 
 ## Installing the APK on a phone
@@ -73,6 +77,7 @@ To be run by a person on a real phone with the debug APK. Tick each item and not
 Phone / Android version: ________
 
 - [ ] **Permission prompt on first launch** — on Android 13+ the notification permission prompt appears (or the in-app enable button triggers it); granting it enables reminders.
+- [ ] **Exact alarms** — on Android 12+/14+, if Settings → *Exact reminders* shows **Enable** (and Home shows the "Reminders may be late" banner), tap it, allow *Alarms & reminders* for SkillUp, return: the row shows **On** and the banner is gone.
 - [ ] **Reminder while killed** — set a reminder 2 minutes ahead, swipe the app away from recents; the reminder arrives on time showing the habit's rank emblem (large icon) and the flame in the status bar.
 - [ ] **Running-session notification** — start a timer: an ongoing (non-dismissable) notification appears; its **Stop** action stops the session and the app reflects it.
 - [ ] **Commitment reached** — completing the day's commitment shows confetti and the phone vibrates.

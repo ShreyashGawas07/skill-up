@@ -9,12 +9,15 @@ const LN = vi.hoisted(() => ({
   addListener: vi.fn(async () => ({ remove: async () => {} })),
   checkPermissions: vi.fn(),
   requestPermissions: vi.fn(),
+  checkExactNotificationSetting: vi.fn(),
+  changeExactNotificationSetting: vi.fn(async () => ({ exact_alarm: 'granted' })),
 }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => native.value } }))
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: LN }))
 
 import {
-  applySchedule, notificationPermission, registerNotificationActions, requestNotificationPermission,
+  applySchedule, exactAlarmStatus, notificationPermission, openExactAlarmSetting, registerNotificationActions,
+  requestNotificationPermission,
 } from '@/notify/scheduler'
 import type { NotifSpec } from '@/notify/plan'
 
@@ -86,5 +89,24 @@ describe('scheduler', () => {
     expect(await notificationPermission()).toBe('granted')
     LN.requestPermissions.mockResolvedValueOnce({ display: 'granted' })
     expect(await requestNotificationPermission()).toBe(true)
+  })
+
+  it('maps exact-alarm states; unsupported when the platform rejects', async () => {
+    LN.checkExactNotificationSetting.mockResolvedValueOnce({ exact_alarm: 'granted' })
+    expect(await exactAlarmStatus()).toBe('granted')
+    LN.checkExactNotificationSetting.mockResolvedValueOnce({ exact_alarm: 'denied' })
+    expect(await exactAlarmStatus()).toBe('denied')
+    LN.checkExactNotificationSetting.mockRejectedValueOnce(new Error('not implemented'))
+    expect(await exactAlarmStatus()).toBe('unsupported')
+  })
+
+  it('openExactAlarmSetting opens the system screen on native only', async () => {
+    await openExactAlarmSetting()
+    expect(LN.changeExactNotificationSetting).toHaveBeenCalledOnce()
+    native.value = false
+    await openExactAlarmSetting()
+    expect(LN.changeExactNotificationSetting).toHaveBeenCalledOnce()
+    expect(await exactAlarmStatus()).toBe('unsupported')
+    expect(LN.checkExactNotificationSetting).not.toHaveBeenCalled()
   })
 })

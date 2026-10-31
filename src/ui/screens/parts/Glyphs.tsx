@@ -1,7 +1,7 @@
 /** Small stroke icons for buttons. Decorative unless a label is given. */
 type Name =
   | 'plus' | 'lock' | 'gear' | 'pencil' | 'trophy' | 'back' | 'next' | 'check' | 'minus'
-  | 'trash' | 'bell' | 'bellOff' | 'upload' | 'download' | 'close' | 'sound' | 'mute' | 'motion'
+  | 'trash' | 'bell' | 'bellOff' | 'upload' | 'download' | 'close' | 'sound' | 'mute' | 'motion' | 'alarm'
 
 const PATHS: Record<Name, string> = {
   plus: 'M12 5v14M5 12h14',
@@ -23,6 +23,7 @@ const PATHS: Record<Name, string> = {
   sound: 'M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12',
   mute: 'M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6',
   motion: 'M3 12h4M5 7h6M5 17h6M13 12a5 5 0 1 0 10 0 5 5 0 0 0-10 0',
+  alarm: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M5 3L2 6M19 3l3 3',
 }
 
 export function Glyph({ name, size = 22, label }: { name: Name; size?: number; label?: string }) {

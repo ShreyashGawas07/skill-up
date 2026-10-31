@@ -1,21 +1,19 @@
 // Renders Android icon assets from the app's own SVG art (run with `tsx scripts/render-icons.mjs`).
-//   drawable/rank_1..10.png       256 px tier emblems (notification large icons)
+//   drawable-nodpi/rank_1..10.png 256 px tier emblems (notification large icons; nodpi = never rescaled)
 //   drawable/ic_stat_flame.png    96 px white flame (notification small icon)
 //   mipmap-*/ic_launcher*.png     tier-10 emblem on the dark background (launcher icon)
 //   drawable*/splash.png          tier-10 emblem centred on the dark background (splash)
-import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Resvg } from '@resvg/resvg-js'
 import { emblemSvg } from '../src/ui/art/emblemSvg.ts'
+import { FLAME_OUTER } from '../src/ui/art/flamePath.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const RES = join(ROOT, 'android', 'app', 'src', 'main', 'res')
 const BG = '#0b0b12'
 
-// Same silhouette as the OUTER path in src/ui/art/Flame.tsx (viewBox 0 0 64 80).
-const FLAME_PATH =
-  'M32 4 C38 18 54 28 54 48 C54 64 44 76 32 76 C20 76 10 64 10 48 C10 36 18 30 22 20 C24 30 28 32 30 30 C28 20 28 12 32 4 Z'
 
 const LAUNCHER = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 }
 // Adaptive-icon foreground layers are 108dp; only the centre 66dp is guaranteed visible.
@@ -37,7 +35,7 @@ function placeEmblem(tier, x, y, size) {
 
 export function flameSvg() {
   // Square 84-unit viewBox around the 44x72 flame with a little padding.
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -2 84 84"><path d="${FLAME_PATH}" fill="#ffffff"/></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -2 84 84"><path d="${FLAME_OUTER}" fill="#ffffff"/></svg>`
 }
 
 export function launcherSvg(round) {
@@ -77,7 +75,9 @@ function main() {
     process.exit(1)
   }
   console.log('Rendering Android icons:')
-  for (let t = 1; t <= 10; t++) write(`drawable/rank_${t}.png`, renderPng(emblemSvg(t, { idSuffix: 'n' }), 256))
+  // Earlier builds wrote these to drawable/ (treated as mdpi and upscaled); remove stale copies.
+  for (let t = 1; t <= 10; t++) rmSync(join(RES, 'drawable', `rank_${t}.png`), { force: true })
+  for (let t = 1; t <= 10; t++) write(`drawable-nodpi/rank_${t}.png`, renderPng(emblemSvg(t, { idSuffix: 'n' }), 256))
   write('drawable/ic_stat_flame.png', renderPng(flameSvg(), 96))
   for (const [d, px] of Object.entries(LAUNCHER)) {
     write(`mipmap-${d}/ic_launcher.png`, renderPng(launcherSvg(false), px))

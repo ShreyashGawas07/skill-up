@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import type { Settings as AppSettings } from '@/data/repo'
-import { requestNotificationPermission } from '@/notify/scheduler'
+import { openExactAlarmSetting, requestNotificationPermission } from '@/notify/scheduler'
 import { useApp } from '@/store/useApp'
 import { OPEN_SETTINGS_HINT } from '@/ui/overlay/PermissionBanner'
-import { usePermission } from '@/ui/overlay/usePermission'
+import { useExactAlarm, usePermission } from '@/ui/overlay/usePermission'
 import { BackupSection } from './parts/BackupSection'
 import { motionPref } from './parts/format'
 import { Glyph } from './parts/Glyphs'
@@ -32,11 +32,21 @@ export function Settings({ onBack }: { onBack(): void }) {
   const saveSettings = useApp((s) => s.saveSettings)
   const rm = motionPref(settings.reduceMotion)
   const [perm, recheck] = usePermission()
+  const [exact, recheckExact] = useExactAlarm()
   const save = (patch: Partial<AppSettings>) => void saveSettings({ ...settings, ...patch })
 
   const enable = async () => {
     await requestNotificationPermission()
     await recheck()
+  }
+
+  const enableExact = async () => {
+    try {
+      await openExactAlarmSetting()
+    } finally {
+      // Also re-checked when the app resumes from the system screen.
+      await recheckExact()
+    }
   }
 
   return (
@@ -105,6 +115,26 @@ export function Settings({ onBack }: { onBack(): void }) {
         )}
       </Row>
       {perm === 'denied' && <p className="-mt-1 px-4 text-xs text-white/50">{OPEN_SETTINGS_HINT}</p>}
+
+      {(exact === 'granted' || exact === 'denied') && (
+        <Row icon={<Glyph name="alarm" />} label="Exact reminders">
+          {exact === 'granted' ? (
+            <span className="flex items-center gap-1 rounded-full bg-[#69db7c]/15 px-3 py-1 text-sm font-semibold text-[#69db7c]">
+              <Glyph name="check" size={14} />
+              On
+            </span>
+          ) : (
+            <button
+              type="button"
+              aria-label="Enable exact reminders"
+              onClick={() => void enableExact().catch(() => {})}
+              className="min-h-[44px] rounded-2xl bg-gradient-to-br from-[#9775fa] to-[#4dabf7] px-4 text-sm font-semibold"
+            >
+              Enable
+            </button>
+          )}
+        </Row>
+      )}
 
       <h2 className="mt-4 px-1 font-display text-xs font-bold uppercase tracking-[0.2em] text-white/40">Backup</h2>
       <BackupSection reducedMotion={rm} />

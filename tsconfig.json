@@ -19,5 +19,5 @@
     "paths": { "@/*": ["src/*"] },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", "tests", "vitest.setup.ts", "vite.config.ts", "tailwind.config.ts"]
+  "include": ["src", "tests", "vitest.setup.ts", "vite.config.ts", "tailwind.config.ts", "capacitor.config.ts"]
 }

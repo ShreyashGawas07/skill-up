@@ -118,10 +118,22 @@ describe('HabitCard', () => {
     })
     await waitFor(() => expect(S().running?.habitId).toBe('a'))
     act(() => S().tick(now + 5000))
-    const stopBtn = screen.getByRole('button', { name: 'Stop a' })
+    const stopBtn = screen.getByRole('button', { name: 'Pause a' })
     expect(stopBtn).toHaveAccessibleDescription('0:00:05')
     expect(screen.getByText('0:00:05')).toBeInTheDocument()
     expect(nav).not.toHaveBeenCalled()
+  })
+
+  it('after a break the timer reads Paused with a Resume button, and Done today once met', async () => {
+    await repo.putHabit(habit('a'))
+    await act(() => S().load())
+    act(() => useApp.setState({ states: { a: state('a', { todayMinutes: 30 }) } }))
+    render(<Home onNavigate={nav} />)
+    expect(screen.getByText('Paused')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Resume a' })).toBeInTheDocument()
+    act(() => useApp.setState({ states: { a: state('a', { todayMinutes: 60 }) } }))
+    expect(screen.getByText('Done today')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start a' })).toBeInTheDocument()
   })
 
   it('fires confetti and haptic.success once when today crosses the commitment', async () => {

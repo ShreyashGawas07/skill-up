@@ -131,7 +131,7 @@ describe('scheduler', () => {
     const onStop = vi.fn()
     await registerNotificationActions(onStop)
     expect(LN.registerActionTypes).toHaveBeenCalledWith({
-      types: [{ id: 'SESSION', actions: [{ id: 'STOP', title: 'Stop' }] }],
+      types: [{ id: 'SESSION', actions: [{ id: 'STOP', title: 'Pause' }] }],
     })
     const handler = (LN.addListener.mock.calls[0] as unknown as [string, (a: unknown) => void])[1]
     handler({ actionId: 'tap', notification: {} })

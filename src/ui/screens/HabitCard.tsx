@@ -64,6 +64,9 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
   const nextTier = Math.min(state.earnedTier + 1, MAX_TIER)
   const nextAt = tierThresholdHours(nextTier, target) / target
   const met = c > 0 && today >= c
+  // Stopping saves the session and starting again adds a new one to today's total, so to the
+  // user the timer is Start → Pause → Resume.
+  const action = live ? 'Pause' : today > 0 && !met ? 'Resume' : 'Start'
   const clock = live ? fmtClock(now - running!.start) : fmtHM(today)
   const left = Math.max(0, c - today)
 
@@ -125,8 +128,16 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
       {/* Timer widget: ink clock panel + pastel ring tile. */}
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <div className="relative flex min-w-0 flex-col justify-between rounded-[22px] border-[1.5px] border-line bg-panel p-4 text-[#f4ede2]">
-          <span className="font-display text-xs font-semibold uppercase tracking-[0.14em] opacity-60">
-            {live ? 'Timer' : met ? 'Done today' : 'Today'}
+          <span className="flex items-center gap-1.5 font-display text-xs font-semibold uppercase tracking-[0.14em]">
+            {live && (
+              <span className="relative flex h-2 w-2" aria-hidden>
+                {!reduce && <span className="absolute inset-0 animate-ping rounded-full bg-[#7ee2a0] opacity-75" />}
+                <span className="relative h-2 w-2 rounded-full bg-[#7ee2a0]" />
+              </span>
+            )}
+            <span className={live ? 'text-[#7ee2a0]' : 'opacity-60'}>
+              {live ? 'Running' : met ? 'Done today' : today > 0 ? 'Paused' : 'Today'}
+            </span>
           </span>
           <span
             id={clockId}
@@ -141,15 +152,15 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
           </span>
           <button
             type="button"
-            aria-label={`${live ? 'Stop' : 'Start'} ${habit.name}`}
+            aria-label={`${action} ${habit.name}`}
             aria-describedby={live ? clockId : undefined}
             onClick={toggle}
             className={`mt-3 inline-flex min-h-[40px] w-fit items-center gap-2 rounded-full px-5 font-display text-sm font-bold transition-transform active:scale-95 ${
               live ? 'bg-white/15 text-[#f4ede2]' : 'bg-accent text-on-tint'
             }`}
           >
-            <Glyph name={live ? 'stop' : 'play'} size={14} />
-            {live ? 'Stop' : 'Start'}
+            <Glyph name={live ? 'pause' : 'play'} size={14} />
+            {action}
           </button>
         </div>
 
@@ -170,7 +181,7 @@ export function HabitCard({ habit, state, running, now, reducedMotion, onStart, 
               size={128}
               reducedMotion={reducedMotion}
             >
-              {/* Mirror of the Start/Stop button for a bigger target; the labelled button is the accessible one. */}
+              {/* Mirror of the Start/Pause button for a bigger target; the labelled button is the accessible one. */}
               <div
                 aria-hidden
                 onClick={toggle}

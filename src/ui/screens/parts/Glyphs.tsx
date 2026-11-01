@@ -2,7 +2,7 @@
 type Name =
   | 'plus' | 'lock' | 'gear' | 'pencil' | 'trophy' | 'back' | 'next' | 'check' | 'minus'
   | 'trash' | 'bell' | 'bellOff' | 'upload' | 'download' | 'close' | 'sound' | 'mute' | 'motion' | 'alarm'
-  | 'home' | 'clock' | 'chart' | 'sun' | 'moon' | 'auto' | 'target' | 'bolt' | 'play' | 'stop'
+  | 'home' | 'clock' | 'chart' | 'sun' | 'moon' | 'auto' | 'target' | 'bolt' | 'play' | 'stop' | 'pause'
 
 const PATHS: Record<Name, string> = {
   home: 'M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5',
@@ -15,6 +15,7 @@ const PATHS: Record<Name, string> = {
   bolt: 'M13 3L5 14h6l-1 7 8-11h-6l1-7z',
   play: 'M8 5.5v13l10-6.5z',
   stop: 'M7 7h10v10H7z',
+  pause: 'M7 5h3v14H7zM14 5h3v14h-3z',
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
   lock: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z',

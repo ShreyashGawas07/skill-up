@@ -72,7 +72,7 @@ export async function applySchedule(specs: NotifSpec[]): Promise<void> {
 export async function registerNotificationActions(onStop: () => void): Promise<void> {
   if (!native()) return
   await LocalNotifications.registerActionTypes({
-    types: [{ id: 'SESSION', actions: [{ id: 'STOP', title: 'Stop' }] }],
+    types: [{ id: 'SESSION', actions: [{ id: 'STOP', title: 'Pause' }] }],
   })
   await LocalNotifications.addListener('localNotificationActionPerformed', (a) => {
     if (a.actionId === 'STOP') onStop()
